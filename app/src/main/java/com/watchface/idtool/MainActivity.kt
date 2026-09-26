@@ -57,6 +57,7 @@ import com.watchface.idtool.ui.GlassNavBar
 import com.watchface.idtool.ui.GlobalRippleOverlay
 import com.watchface.idtool.ui.HistoryScreen
 import com.watchface.idtool.ui.LoadingOverlay
+import com.watchface.idtool.ui.LocalAppBackdrop
 import com.watchface.idtool.ui.ModifyScreen
 import com.watchface.idtool.ui.ResultDialog
 import com.watchface.idtool.ui.SettingsScreen
@@ -64,6 +65,7 @@ import com.watchface.idtool.ui.SnowfallLayer
 import com.watchface.idtool.ui.ToastMessage
 import com.watchface.idtool.ui.WatchFaceTheme
 import com.watchface.idtool.ui.WelcomeScreen
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 class MainActivity : ComponentActivity() {
 
@@ -197,9 +199,14 @@ private fun AppContent() {
         currentPage = page
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    // AndroidLiquidGlass：全局背景折射层。AppBackground 将自身绘制内容
+    // 注册到该层，所有 .liquidGlass() 玻璃组件据此做真实折射/模糊
+    val appBackdrop = rememberLayerBackdrop()
+
+    androidx.compose.runtime.CompositionLocalProvider(LocalAppBackdrop provides appBackdrop) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // L0 背景：自定义壁纸 / 纯色 / 液态动态（全屏铺满，含系统栏区域；
         //          图片 ContentScale.Crop 保持原比例居中裁剪，任意屏幕比例不变形）
         AppBackground()
@@ -305,5 +312,6 @@ private fun AppContent() {
 
         // L4 全局点击光效：View 层监听 · 零拦截 · 最顶层绘制
         GlobalRippleOverlay()
+        }
     }
 }
