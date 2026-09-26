@@ -3,19 +3,22 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    // 注意：AGP 9.0 起 Kotlin 支持已内建，不能再 apply 'org.jetbrains.kotlin.android'。
+    // Compose 编译器插件仍然需要单独 apply。
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.watchface.idtool"
-    compileSdk = 36
-    buildToolsVersion = "36.0.0"
+    // compileSdk 必须 >= 37：backdrop 2.0.1 传递依赖的 compose ui / lifecycle 2.11
+    // 都要求在 37 或更高版本上编译。
+    compileSdk = 37
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.watchface.idtool"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 39
         versionName = "3.9"
         ndk {
@@ -53,20 +56,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
-    kotlinOptions {
-        jvmTarget = "21"
-        freeCompilerArgs += listOf(
-            "-opt-in=kotlin.RequiresOptIn"
-        )
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-
-    androidResources {
-        localeFilters += listOf("zh", "en")
     }
 
     packaging {
@@ -82,12 +74,22 @@ android {
     }
 }
 
+// AGP 9.0 起 Kotlin 由 AGP 内建，kotlin { } 块提升到顶层。
+// kotlinOptions 在 Kotlin 2.4 已移除，统一用 compilerOptions。
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        freeCompilerArgs.add("-opt-in=kotlin.RequiresOptIn")
+    }
+}
+
 dependencies {
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation(platform("androidx.compose:compose-bom:2025.03.00"))
+    // 版本随 AGP 9.1.0 + compileSdk 37 一同抬升：backdrop 2.0.1 的传递依赖
+    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -95,6 +97,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
+    // AndroidLiquidGlass（Kyant0/backdrop）：真实液态玻璃（背景折射 + vibrancy + lens）
+    implementation("io.github.kyant0:backdrop:2.0.1")
+    implementation("io.github.kyant0:shapes:1.2.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

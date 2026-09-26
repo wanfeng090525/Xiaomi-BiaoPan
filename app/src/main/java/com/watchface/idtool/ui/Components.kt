@@ -70,6 +70,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,6 +106,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.kyant.backdrop.backdrops.LayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 import com.watchface.idtool.AppSettings
 import com.watchface.idtool.BgMode
 import com.watchface.idtool.ClickSound
@@ -163,6 +171,43 @@ object AppColors {
 
     @Composable
     fun infoAdaptive(): Color = info
+}
+
+// ====================================================================
+// AndroidLiquidGlass（Kyant0/backdrop）真实液态玻璃接入
+//
+//   · LocalAppBackdrop  全局折射采样源（根布局 AppBackground 注册）
+//   · Modifier.liquidGlass(shape)  在绘制真实折射/模糊玻璃后，
+//     再叠加原 painted 玻璃高光，形成「折射 + 高光」双层材质
+//   · API < 31 无 RenderEffect、< 33 无 RuntimeShader 时库内部自动降级
+// ====================================================================
+
+/** 全局液态玻璃背景层：由根布局的 AppBackground 注册，玻璃组件据此折射采样 */
+val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
+
+/**
+ * 真实液态玻璃材质：
+ *   1. vibrancy  背景色彩 vibrancy（iOS 同款提亮）
+ *   2. blur      磨砂模糊
+ *   3. lens      边缘折射（height 8dp / amount 24dp）
+ * 之后继续叠加调用方的 painted 玻璃高光（.glass()），保持原有视觉语言。
+ * 无背景层（LocalAppBackdrop 为 null）时安全降级为原 painted 玻璃。
+ */
+@Composable
+fun Modifier.liquidGlass(
+    shape: Shape,
+    blurRadius: Dp = 14.dp
+): Modifier {
+    val backdrop = LocalAppBackdrop.current ?: return this
+    return this.drawBackdrop(
+        backdrop = backdrop,
+        shape = { shape },
+        effects = {
+            vibrancy()
+            blur(blurRadius.toPx())
+            lens(refractionHeight = 8.dp.toPx(), refractionAmount = 24.dp.toPx())
+        }
+    )
 }
 
 /** 玻璃材质参数 */
@@ -897,10 +942,14 @@ fun LiquidBackground(modifier: Modifier = Modifier) {
 @Composable
 fun AppBackground(modifier: Modifier = Modifier) {
     val cfg = AppSettings.bgConfig
+    // 注册为全局液态玻璃的折射采样源：所有 liquidGlass() 组件都会真实
+    // 采样/折射此处绘制的背景（壁纸、纯色或液态动态）
+    val backdrop = LocalAppBackdrop.current
+    val bgModifier = if (backdrop != null) modifier.layerBackdrop(backdrop) else modifier
     when (cfg.mode) {
-        BgMode.LIQUID -> LiquidBackground(modifier)
+        BgMode.LIQUID -> LiquidBackground(bgModifier)
 
-        BgMode.COLOR -> ColorBackground(cfg.color, modifier)
+        BgMode.COLOR -> ColorBackground(cfg.color, bgModifier)
 
         BgMode.GALLERY -> {
             val context = LocalContext.current
@@ -924,19 +973,19 @@ fun AppBackground(modifier: Modifier = Modifier) {
                 Image(
                     bitmap = bmp.asImageBitmap(),
                     contentDescription = null,
-                    modifier = modifier.fillMaxSize(),
+                    modifier = bgModifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
-                PhotoScrim(modifier)
+                PhotoScrim(bgModifier)
             } else {
                 // 图片尚未解码完成：深色打底避免闪白
-                ColorBackground(0xFF14151F, modifier)
+                ColorBackground(0xFF14151F, bgModifier)
             }
         }
 
         else -> {
             // 原「默认壁纸」已移除，历史遗留 DEFAULT / 未知模式统一兜底为液态动态
-            LiquidBackground(modifier)
+            LiquidBackground(bgModifier)
         }
     }
 }
@@ -1421,6 +1470,7 @@ fun GlassCard(
         modifier = modifier
             .glassShadow(shadowElevation, shape)
             .then(base)
+            .liquidGlass(shape)
             .glass(shape, colors)
             .padding(contentPadding),
         content = content
@@ -1743,6 +1793,7 @@ fun GlassNavBar(
 
     Box(
         modifier = modifier
+            .liquidGlass(RoundedCornerShape(50))
             .glass(RoundedCornerShape(50), rememberGlassColors())
             .padding(horizontal = 7.dp, vertical = 7.dp)
     ) {
@@ -1905,6 +1956,7 @@ fun GlassFabButton(
                 if (selected) Color.White.copy(alpha = 0.35f) else Color.Transparent,
                 radiusFraction = 1.4f
             )
+            .liquidGlass(CircleShape, blurRadius = 10.dp)
             .glass(CircleShape, if (selected) activeColors else idleColors)
             .pressRipple(
                 interaction,
