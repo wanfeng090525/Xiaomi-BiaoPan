@@ -81,6 +81,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.ShaderBrush
@@ -106,13 +107,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.InnerShadow
+import com.kyant.backdrop.shadow.Shadow
+import com.kyant.shapes.Capsule
 import com.watchface.idtool.AppSettings
 import com.watchface.idtool.BgMode
 import com.watchface.idtool.ClickSound
@@ -174,11 +181,12 @@ object AppColors {
 }
 
 // ====================================================================
-// AndroidLiquidGlass（Kyant0/backdrop）真实液态玻璃接入
+// AndroidLiquidGlass（Kyant0/backdrop）真实液态玻璃接入 · v2 深度对接
 //
-//   · LocalAppBackdrop  全局折射采样源（根布局 AppBackground 注册）
-//   · Modifier.liquidGlass(shape)  在绘制真实折射/模糊玻璃后，
-//     再叠加原 painted 玻璃高光，形成「折射 + 高光」双层材质
+//   · LocalAppBackdrop  全局折射采样源（AppBackground + 内容区均注册）
+//   · Modifier.liquidGlass(shape)  真实折射/模糊玻璃 + painted 高光双层材质
+//   · 效果顺序遵循官方文档：colorFilter(vibrancy) ⇒ blur ⇒ lens
+//   · 按压缩放走 layerBlock（背景折射不跟手缩放，官方 Interactive 教程规格）
 //   · API < 31 无 RenderEffect、< 33 无 RuntimeShader 时库内部自动降级
 // ====================================================================
 
@@ -186,17 +194,22 @@ object AppColors {
 val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
 /**
- * 真实液态玻璃材质：
+ * 真实液态玻璃材质（官方文档 get-started / glass-bottom-bar 规格）：
  *   1. vibrancy  背景色彩 vibrancy（iOS 同款提亮）
- *   2. blur      磨砂模糊
- *   3. lens      边缘折射（height 8dp / amount 24dp）
- * 之后继续叠加调用方的 painted 玻璃高光（.glass()），保持原有视觉语言。
+ *   2. blur      磨砂模糊（默认 8dp，轻磨砂保通透）
+ *   3. lens      边缘折射（height 16dp / amount 24dp，height ≤ 形状最小圆角半径）
+ *
+ * [layerBlock] 按压缩放等图形变换：变换只作用于「玻璃面板 + 内容」，
+ * 背景折射保持原位（文档 Interactive 教程明确：graphicsLayer 缩放会让背景跟随缩放）。
  * 无背景层（LocalAppBackdrop 为 null）时安全降级为原 painted 玻璃。
  */
 @Composable
 fun Modifier.liquidGlass(
     shape: Shape,
-    blurRadius: Dp = 14.dp
+    blurRadius: Dp = 8.dp,
+    lensHeight: Dp = 16.dp,
+    lensAmount: Dp = 24.dp,
+    layerBlock: (GraphicsLayerScope.() -> Unit)? = null
 ): Modifier {
     val backdrop = LocalAppBackdrop.current ?: return this
     return this.drawBackdrop(
@@ -205,10 +218,56 @@ fun Modifier.liquidGlass(
         effects = {
             vibrancy()
             blur(blurRadius.toPx())
-            lens(refractionHeight = 8.dp.toPx(), refractionAmount = 24.dp.toPx())
-        }
+            lens(refractionHeight = lensHeight.toPx(), refractionAmount = lensAmount.toPx())
+        },
+        layerBlock = layerBlock
     )
 }
+
+/**
+ * 液态玻璃选中面板（LiquidBottomTabs 参考组件规格）：
+ * 组合折射源（全局背景 + Dock 自身内容），按压时折射加深 + 色散 + 内阴影，
+ * 玻璃面板随按压弹簧放大（背景不跟随缩放）。
+ *
+ * [pressProgress] 0f..1f 按压进度（弹簧驱动）。
+ */
+@Composable
+fun Modifier.liquidGlassPanel(
+    backdrop: Backdrop,
+    shape: Shape,
+    pressProgress: () -> Float,
+    lensHeight: Dp = 10.dp,
+    lensAmount: Dp = 14.dp
+): Modifier = this.drawBackdrop(
+    backdrop = backdrop,
+    shape = { shape },
+    effects = {
+        // 按压越深折射越强 + 开启色散（LiquidBottomTabs: lens(10p, 14p, chromaticAberration)）
+        val p = pressProgress()
+        val k = 0.5f + 0.5f * p
+        lens(
+            refractionHeight = lensHeight.toPx() * k,
+            refractionAmount = lensAmount.toPx() * k,
+            chromaticAberration = p > 0.15f
+        )
+    },
+    highlight = {
+        // 按压时顶部高光提亮（默认细高光 + 进度调制）
+        Highlight(alpha = 0.4f + 0.4f * pressProgress())
+    },
+    innerShadow = {
+        // 按压内阴影：液态下陷质感
+        InnerShadow(radius = 6.dp * pressProgress(), alpha = 0.35f * pressProgress())
+    },
+    shadow = {
+        Shadow(radius = 0.dp, alpha = 0f)
+    },
+    layerBlock = {
+        val s = 1f + 0.05f * pressProgress()
+        scaleX = s
+        scaleY = s
+    }
+)
 
 /** 玻璃材质参数 */
 data class GlassColors(
@@ -1453,9 +1512,16 @@ fun GlassCard(
     val colors = rememberGlassColors(tintTop, tintBottom)
     val clickInteraction = remember(onClick != null) { MutableInteractionSource() }
     val cardContext = LocalContext.current
+    // 按压进度：走 liquidGlass 的 layerBlock 缩放玻璃面板，
+    // 背景折射保持原位（graphicsLayer 缩放会让折射背景跟随缩放，官方文档禁止）
+    val cardPressed by clickInteraction.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(
+        targetValue = if (cardPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
+        label = "cardPressScale"
+    )
     val base = if (onClick != null) {
         Modifier
-            .pressScale(clickInteraction)
             .clickable(interactionSource = clickInteraction, indication = null) {
                 if (AppSettings.soundEnabled) {
                     ClickSound.play(cardContext)
@@ -1470,7 +1536,17 @@ fun GlassCard(
         modifier = modifier
             .glassShadow(shadowElevation, shape)
             .then(base)
-            .liquidGlass(shape)
+            .liquidGlass(
+                shape = shape,
+                // 卡片 24dp 圆角：轻磨砂保通透，lens height ≤ 最小圆角半径
+                blurRadius = 6.dp,
+                lensHeight = 12.dp,
+                lensAmount = 20.dp,
+                layerBlock = {
+                    scaleX = cardScale
+                    scaleY = cardScale
+                }
+            )
             .glass(shape, colors)
             .padding(contentPadding),
         content = content
@@ -1502,6 +1578,13 @@ fun GlassButton(
     val interaction = remember { MutableInteractionSource() }
     val context = LocalContext.current
     val shape = RoundedCornerShape(50)
+    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScaleAnim by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
+        label = "buttonPressScale"
+    )
 
     val container = when (style) {
         GlassButtonStyle.Primary -> {
@@ -1540,7 +1623,16 @@ fun GlassButton(
     Box(
         modifier = modifier
             .height(height)
-            .pressScale(interaction, pressedScale = 0.94f)
+            .liquidGlass(
+                shape = shape,
+                blurRadius = 6.dp,
+                lensHeight = 12.dp,
+                lensAmount = 20.dp,
+                layerBlock = {
+                    scaleX = pressScaleAnim
+                    scaleY = pressScaleAnim
+                }
+            )
             .then(container)
             .pressRipple(
                 interaction,
@@ -1602,12 +1694,28 @@ fun GlassIconButton(
     val context = LocalContext.current
     // 图标无彩色规格：容器与图标统一中性白玻璃
     val colors = rememberGlassColors()
+    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val iconPressed by interaction.collectIsPressedAsState()
+    val iconScale by animateFloatAsState(
+        targetValue = if (iconPressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
+        label = "iconPressScale"
+    )
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
             .glassShadow(3.dp, CircleShape)
-            .pressScale(interaction, pressedScale = 0.88f)
+            .liquidGlass(
+                shape = CircleShape,
+                blurRadius = 4.dp,
+                lensHeight = 6.dp,
+                lensAmount = 12.dp,
+                layerBlock = {
+                    scaleX = iconScale
+                    scaleY = iconScale
+                }
+            )
             .glass(CircleShape, colors)
             .pressRipple(interaction, clipShape = CircleShape, color = tint, intensity = 1.2f)
             .clickable(interactionSource = interaction, indication = null) {
@@ -1666,15 +1774,28 @@ fun GlassChip(
         animationSpec = spring(dampingRatio = 0.6f, stiffness = 500f),
         label = "chipScale"
     )
+    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val chipPressed by interaction.collectIsPressedAsState()
+    val chipPressScale by animateFloatAsState(
+        targetValue = if (chipPressed) 0.93f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
+        label = "chipPressScale"
+    )
 
     Box(
         modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
             .glassShadow(if (selected) 6.dp else 2.dp, shape)
-            .pressScale(interaction, pressedScale = 0.93f)
+            .liquidGlass(
+                shape = shape,
+                blurRadius = 4.dp,
+                lensHeight = 8.dp,
+                lensAmount = 12.dp,
+                layerBlock = {
+                    val s = scale * chipPressScale
+                    scaleX = s
+                    scaleY = s
+                }
+            )
             .glow(if (selected) active else Color.Transparent, radiusFraction = 1.5f)
             .drawBehind {
                 val outline = shape.createOutline(size, layoutDirection, this)
@@ -1791,19 +1912,88 @@ fun GlassNavBar(
         }
     }
 
+    // AndroidLiquidGlass 深度对接（LiquidBottomTabs 参考规格）：
+    //   · tabsBackdrop  记录 Dock 自身图标/文字，指示条经 CombinedBackdrop 一并折射
+    //   · pressProgress 选中 Tab 按压进度：折射加深 + 色散 + 内阴影 + 面板弹簧放大
+    val appBackdrop = LocalAppBackdrop.current
+    val tabsBackdrop = rememberLayerBackdrop()
+    val indicatorBackdrop = if (appBackdrop != null) rememberCombinedBackdrop(appBackdrop, tabsBackdrop) else null
+    var pressedTabIndex by remember { mutableStateOf(-1) }
+    val pressProgress by animateFloatAsState(
+        targetValue = if (safeIndex >= 0 && pressedTabIndex == safeIndex) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f, visibilityThreshold = 0.001f),
+        label = "tabPressProgress"
+    )
+
     Box(
         modifier = modifier
-            .liquidGlass(RoundedCornerShape(50))
+            .liquidGlass(
+                // G2 连续胶囊：官方 shapes 库，圆角更圆润
+                shape = Capsule(),
+                blurRadius = 8.dp,
+                lensHeight = 20.dp,
+                lensAmount = 24.dp,
+                layerBlock = {
+                    val s = 1f + 0.015f * pressProgress
+                    scaleX = s
+                    scaleY = s
+                }
+            )
             .glass(RoundedCornerShape(50), rememberGlassColors())
             .padding(horizontal = 7.dp, vertical = 7.dp)
     ) {
-        // 滑动高亮指示条：垫底绘制，随选中切换弹簧滑动
+        // 隐藏副本行：透明绘制进 tabsBackdrop，供指示条折射采样
+        // （参考组件同款手法：副本先行绘制，保证指示条读取到当帧内容）
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = 0f }
+                .layerBackdrop(tabsBackdrop)
+        ) {
+            tabs.forEachIndexed { _, tab ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.height(38.dp).padding(horizontal = 13.dp)
+                ) {
+                    Icon(
+                        tab.icon,
+                        contentDescription = null,
+                        tint = Color(0xFFF3F5FA),
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = tab.label,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.2.sp,
+                        color = Color(0xFFF3F5FA),
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        // 滑动高亮指示条：真实液态玻璃面板（折射背景 + Dock 内容），垫底绘制
         if (safeIndex in tabs.indices) {
             Box(
                 modifier = Modifier
                     .offset { IntOffset(indicatorX.value.roundToInt(), 0) }
                     .width(with(density) { indicatorW.value.toDp() })
                     .height(38.dp)
+                    .then(
+                        if (indicatorBackdrop != null) {
+                            Modifier.liquidGlassPanel(
+                                backdrop = indicatorBackdrop,
+                                shape = Capsule(),
+                                pressProgress = { pressProgress }
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
                     .glow(Color.White.copy(alpha = 0.18f), radiusFraction = 1.7f)
                     .glass(
                         RoundedCornerShape(19.dp),
@@ -1826,6 +2016,15 @@ fun GlassNavBar(
             tabs.forEachIndexed { index, tab ->
                 val isSelected = index == safeIndex
                 val interaction = remember { MutableInteractionSource() }
+                // 按压追踪：选中 Tab 的按压进度驱动液态指示条折射/色散/放大
+                val tabPressed by interaction.collectIsPressedAsState()
+                LaunchedEffect(tabPressed) {
+                    if (tabPressed) {
+                        pressedTabIndex = index
+                    } else if (pressedTabIndex == index) {
+                        pressedTabIndex = -1
+                    }
+                }
                 // iOS 液态 Dock：所有 Tab 始终同时显示「图标 + 文字」，
                 // 非选中整体收缩 + 变暗，选中项以弹簧微弹到全亮 + 原大。
                 // 选中态的玻璃指示条在底层随切换弹滑，避免"仅选中展开图标"的割裂动画。
@@ -1940,6 +2139,13 @@ fun GlassFabButton(
         rimBright = Color.White.copy(alpha = 0.80f),
         rimDim = Color.Black.copy(alpha = 0.12f)
     )
+    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val fabPressed by interaction.collectIsPressedAsState()
+    val fabPressScale by animateFloatAsState(
+        targetValue = if (fabPressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
+        label = "fabPressScale"
+    )
 
     Box(
         modifier = modifier
@@ -1951,12 +2157,22 @@ fun GlassFabButton(
                 scaleX = s
                 scaleY = s
             }
-            .pressScale(interaction, pressedScale = 0.88f)
             .glow(
                 if (selected) Color.White.copy(alpha = 0.35f) else Color.Transparent,
                 radiusFraction = 1.4f
             )
-            .liquidGlass(CircleShape, blurRadius = 10.dp)
+            .liquidGlass(
+                shape = CircleShape,
+                blurRadius = 10.dp,
+                lensHeight = 10.dp,
+                lensAmount = 20.dp,
+                // 按压缩放走 layerBlock：背景折射不跟手缩放
+                layerBlock = {
+                    val s = fabPressScale
+                    scaleX = s
+                    scaleY = s
+                }
+            )
             .glass(CircleShape, if (selected) activeColors else idleColors)
             .pressRipple(
                 interaction,
