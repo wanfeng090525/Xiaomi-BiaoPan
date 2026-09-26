@@ -410,6 +410,12 @@ private fun HistoryRecordCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .liquidGlass(
+                            RoundedCornerShape(7.dp),
+                            blurRadius = 5.dp,
+                            lensHeight = 4.dp,
+                            lensAmount = 10.dp
+                        )
                         .glass(
                             RoundedCornerShape(7.dp),
                             rememberGlassColors()
@@ -509,6 +515,12 @@ private fun EmptyHistoryState() {
             Box(
                 modifier = Modifier
                     .size(46.dp)
+                    .liquidGlass(
+                        CircleShape,
+                        blurRadius = 4.dp,
+                        lensHeight = 6.dp,
+                        lensAmount = 10.dp
+                    )
                     .glass(CircleShape, rememberGlassColors()),
                 contentAlignment = Alignment.Center
             ) {
