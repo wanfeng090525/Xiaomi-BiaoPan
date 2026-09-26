@@ -1,0 +1,50 @@
+version = 2
+
+[module]
+type = "android-app"
+name = "app"
+languageLevel = "JAVA_21"
+output = "build/classes"
+
+[sourceSets.debug]
+scope = "IMPLEMENTATION"
+assets = ["src/debug/assets"]
+java = ["src/debug/java", "src/debug/kotlin"]
+jniLibs = ["src/debug/jniLibs"]
+res = ["src/debug/res"]
+resources = ["src/debug/resources"]
+
+[sourceSets.main]
+scope = "IMPLEMENTATION"
+assets = ["src/main/assets"]
+java = ["src/main/java", "src/main/kotlin"]
+jniLibs = ["src/main/jniLibs"]
+res = ["src/main/res"]
+resources = ["src/main/resources"]
+
+[sourceSets.release]
+scope = "IMPLEMENTATION"
+assets = ["src/release/assets"]
+java = ["src/release/java", "src/release/kotlin"]
+jniLibs = ["src/release/jniLibs"]
+res = ["src/release/res"]
+resources = ["src/release/resources"]
+
+[dependencies]
+implementation = [{ platform = "androidx.compose:compose-bom:2025.03.00" }, "androidx.core:core-ktx:1.15.0", "androidx.lifecycle:lifecycle-runtime-ktx:2.8.7", "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7", "androidx.activity:activity-compose:1.9.3", "androidx.compose.ui:ui", "androidx.compose.ui:ui-graphics", "androidx.compose.ui:ui-tooling-preview", "androidx.compose.material3:material3", "androidx.compose.material:material-icons-extended", "androidx.navigation:navigation-compose:2.8.5", "androidx.documentfile:documentfile:1.0.1", "dev.rikka.shizuku:api:13.1.5", "dev.rikka.shizuku:provider:13.1.5", "kotlin-stdlib", "androidx.databinding:viewbinding:8.9.1"]
+
+[dependencies.debug]
+implementation = ["androidx.compose.ui:ui-tooling"]
+
+[android]
+namespace = "com.watchface.idtool"
+compileSdk = 35
+minSdk = 24
+targetSdk = 35
+manifest = "src/main/AndroidManifest.xml"
+versionCode = 38
+versionName = "3.8"
+isApplication = true
+buildTypes = [{ name = "release", debuggable = false, minifyEnabled = true, shrinkResources = true, proguardFiles = ["proguard-android-optimize.txt", "proguard-rules.pro"], signingConfig = "picked-watchface" }]
+viewBinding = true
+compose = true
