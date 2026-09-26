@@ -447,11 +447,18 @@ private fun LogoBadge(size: androidx.compose.ui.unit.Dp = 44.dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
             .glassShadow(6.dp, RoundedCornerShape(size * 0.32f))
+            .liquidGlass(
+                shape = RoundedCornerShape(size * 0.32f),
+                blurRadius = 6.dp,
+                lensHeight = 12.dp,
+                lensAmount = 20.dp,
+                // 入场缩放走 layerBlock：背景折射不跟手缩放
+                layerBlock = {
+                    scaleX = scale
+                    scaleY = scale
+                }
+            )
             .glass(
                 RoundedCornerShape(size * 0.32f),
                 rememberGlassColors()
@@ -500,12 +507,28 @@ private fun QuickTile(
     val tileContext = androidx.compose.ui.platform.LocalContext.current
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val tilePressed by interaction.collectIsPressedAsState()
+    val tilePressScale by animateFloatAsState(
+        targetValue = if (tilePressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
+        label = "tilePressScale"
+    )
 
     Box(
         modifier = modifier
             .aspectRatio(1.55f)
             .glassShadow(8.dp, RoundedCornerShape(22.dp))
-            .pressScale(interaction, pressedScale = 0.94f)
+            .liquidGlass(
+                shape = RoundedCornerShape(22.dp),
+                blurRadius = 6.dp,
+                lensHeight = 12.dp,
+                lensAmount = 20.dp,
+                layerBlock = {
+                    scaleX = tilePressScale
+                    scaleY = tilePressScale
+                }
+            )
             .glass(RoundedCornerShape(22.dp), rememberGlassColors())
             .pressRipple(interaction, clipShape = RoundedCornerShape(22.dp), color = tint, intensity = 1.2f)
             .clickable(
@@ -529,6 +552,12 @@ private fun QuickTile(
             Box(
                 modifier = Modifier
                     .size(34.dp)
+                    .liquidGlass(
+                        RoundedCornerShape(12.dp),
+                        blurRadius = 4.dp,
+                        lensHeight = 8.dp,
+                        lensAmount = 12.dp
+                    )
                     .glass(
                         RoundedCornerShape(12.dp),
                         rememberGlassColors()
@@ -656,6 +685,12 @@ private fun HitokotoBar() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .liquidGlass(
+                RoundedCornerShape(20.dp),
+                blurRadius = 6.dp,
+                lensHeight = 12.dp,
+                lensAmount = 20.dp
+            )
             .glass(
                 RoundedCornerShape(20.dp),
                 rememberGlassColors(
@@ -1003,6 +1038,12 @@ private fun ImportedFileCard(
             Box(
                 modifier = Modifier
                     .size(42.dp)
+                    .liquidGlass(
+                        RoundedCornerShape(15.dp),
+                        blurRadius = 4.dp,
+                        lensHeight = 8.dp,
+                        lensAmount = 12.dp
+                    )
                     .glass(
                         RoundedCornerShape(15.dp),
                         rememberGlassColors()
@@ -1457,17 +1498,23 @@ internal fun DownloadProgressDialog(
 /** 弹窗入场动画包装 */
 @Composable
 internal fun DialogEntranceWrapper(content: @Composable () -> Unit) {
-    var shown by remember { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { shown = true }
-    AnimatedVisibility(
-        visible = shown,
-        enter = fadeIn(tween(180)) + androidx.compose.animation.scaleIn(
-            initialScale = 0.85f,
-            animationSpec = spring(dampingRatio = 0.72f, stiffness = 480f)
-        ),
-        exit = fadeOut(tween(150))
+    // 弹窗运行在独立窗口，跨窗口采样主窗口折射层会坐标错位——
+    // 置空 LocalAppBackdrop 让弹窗内玻璃降级为纯 painted 材质
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalAppBackdrop provides null
     ) {
-        content()
+        var shown by remember { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(Unit) { shown = true }
+        AnimatedVisibility(
+            visible = shown,
+            enter = fadeIn(tween(180)) + androidx.compose.animation.scaleIn(
+                initialScale = 0.85f,
+                animationSpec = spring(dampingRatio = 0.72f, stiffness = 480f)
+            ),
+            exit = fadeOut(tween(150))
+        ) {
+            content()
+        }
     }
 }
 

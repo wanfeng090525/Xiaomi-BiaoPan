@@ -7,6 +7,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -21,6 +22,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -420,12 +422,28 @@ private fun FileDropCard(
         tintBottom = if (hasFile) success.copy(alpha = 0.06f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
     )
     val shape = RoundedCornerShape(22.dp)
+    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val dropPressed by interaction.collectIsPressedAsState()
+    val dropPressScale by animateFloatAsState(
+        targetValue = if (dropPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
+        label = "dropPressScale"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .glassShadow(8.dp, shape)
-            .pressScale(interaction, pressedScale = 0.97f)
+            .liquidGlass(
+                shape = shape,
+                blurRadius = 6.dp,
+                lensHeight = 12.dp,
+                lensAmount = 20.dp,
+                layerBlock = {
+                    scaleX = dropPressScale
+                    scaleY = dropPressScale
+                }
+            )
             .glass(shape, colors)
             .drawBehind {
                 // 呼吸描边：加载后为绿色，未加载为蓝色
@@ -458,6 +476,12 @@ private fun FileDropCard(
                     modifier = Modifier
                         .size(56.dp)
                         .glow(borderSpec.copy(alpha = 0.30f), radiusFraction = 1.5f)
+                        .liquidGlass(
+                            CircleShape,
+                            blurRadius = 4.dp,
+                            lensHeight = 6.dp,
+                            lensAmount = 10.dp
+                        )
                         .glass(CircleShape, rememberGlassColors()),
                     contentAlignment = Alignment.Center
                 ) {
@@ -666,6 +690,12 @@ private fun GlassTextField(
         modifier = modifier
             .fillMaxWidth()
             .glassShadow(4.dp, shape)
+            .liquidGlass(
+                shape = shape,
+                blurRadius = 6.dp,
+                lensHeight = 12.dp,
+                lensAmount = 20.dp
+            )
             .glass(shape, colors)
             .drawBehind {
                 val outline = shape.createOutline(size, layoutDirection, this)
@@ -825,6 +855,12 @@ internal fun IconBadge(
         modifier = Modifier
             .size(size)
             .glow(Color.White.copy(alpha = 0.13f), radiusFraction = 1.4f)
+            .liquidGlass(
+                CircleShape,
+                blurRadius = 4.dp,
+                lensHeight = 6.dp,
+                lensAmount = 10.dp
+            )
             .glass(
                 CircleShape,
                 rememberGlassColors()

@@ -501,6 +501,12 @@ private fun IconBadge(icon: ImageVector, tint: Color, size: androidx.compose.ui.
             .size(size)
             .clip(CircleShape)
             .glow(Color.White.copy(alpha = 0.15f), radiusFraction = 1.5f)
+            .liquidGlass(
+                CircleShape,
+                blurRadius = 4.dp,
+                lensHeight = 6.dp,
+                lensAmount = 10.dp
+            )
             .glass(CircleShape, rememberGlassColors()),
         contentAlignment = Alignment.Center
     ) {

@@ -494,10 +494,17 @@ fun GlassSlider(
             modifier = Modifier
                 .size(24.dp)
                 .offset { IntOffset(thumbX.roundToInt(), thumbTop.roundToInt()) }
-                .graphicsLayer {
-                    scaleX = thumbScale
-                    scaleY = thumbScale
-                }
+                .liquidGlass(
+                    shape = CircleShape,
+                    blurRadius = 3.dp,
+                    lensHeight = 5.dp,
+                    lensAmount = 8.dp,
+                    // 拖动放大走 layerBlock：背景折射不跟手缩放
+                    layerBlock = {
+                        scaleX = thumbScale
+                        scaleY = thumbScale
+                    }
+                )
                 .glow(
                     Color.White.copy(alpha = if (dragging) 0.34f else 0.20f),
                     radiusFraction = 1.7f
@@ -1919,8 +1926,10 @@ fun GlassNavBar(
     val tabsBackdrop = rememberLayerBackdrop()
     val indicatorBackdrop = if (appBackdrop != null) rememberCombinedBackdrop(appBackdrop, tabsBackdrop) else null
     var pressedTabIndex by remember { mutableStateOf(-1) }
+    // Dock 整体拖拽：手指滑过 Tab 即直接切页（LiquidBottomTabs 拖拽交互）
+    var dragging by remember { mutableStateOf(false) }
     val pressProgress by animateFloatAsState(
-        targetValue = if (safeIndex >= 0 && pressedTabIndex == safeIndex) 1f else 0f,
+        targetValue = if (safeIndex >= 0 && (pressedTabIndex == safeIndex || dragging)) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f, visibilityThreshold = 0.001f),
         label = "tabPressProgress"
     )
@@ -2011,7 +2020,37 @@ fun GlassNavBar(
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(3.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.pointerInput(tabs.size) {
+                // 手势滑动直接切换：手指滑过 Tab 边界即切页，
+                // 指示条弹簧跟随 + 液态折射反馈；纯点击（未超过滑动阈值）仍交给 Tab 的 clickable
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val downPos = down.position
+                    dragging = true
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (!change.pressed) break
+                            // 未超过触摸斜率前不算拖拽（避免点击时双重切换/音效）
+                            if ((change.position - downPos).getDistance() <
+                                viewConfiguration.touchSlop
+                            ) continue
+                            val x = change.position.x
+                            val idx = tabMetrics.indexOfFirst { m ->
+                                m != null && x >= m.left && x < m.left + m.width
+                            }
+                            if (idx >= 0 && idx != safeIndex) {
+                                ClickSound.play(navContext, SoundType.TOGGLE)
+                                onSelect(idx)
+                            }
+                        }
+                    } finally {
+                        dragging = false
+                    }
+                }
+            }
         ) {
             tabs.forEachIndexed { index, tab ->
                 val isSelected = index == safeIndex
@@ -2236,17 +2275,24 @@ fun StaggeredItem(
 
 @Composable
 private fun DialogEntrance(content: @Composable () -> Unit) {
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    AnimatedVisibility(
-        visible = shown,
-        enter = fadeIn(tween(180)) + scaleIn(
-            initialScale = 0.84f,
-            animationSpec = spring(dampingRatio = 0.72f, stiffness = 480f)
-        ),
-        exit = fadeOut(tween(150))
-    ) {
-        content()
+    // 弹窗运行在独立窗口，跨窗口采样主窗口折射层会坐标错位——
+    // 置空 LocalAppBackdrop 让弹窗内玻璃降级为纯 painted 材质
+    CompositionLocalProvider(LocalAppBackdrop provides null) {
+        var shown by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            delay(60)
+            shown = true
+        }
+        AnimatedVisibility(
+            visible = shown,
+            enter = fadeIn(tween(180)) + scaleIn(
+                initialScale = 0.86f,
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = 420f)
+            ),
+            exit = fadeOut(tween(150))
+        ) {
+            content()
+        }
     }
 }
 
