@@ -65,7 +65,6 @@ import com.watchface.idtool.ui.SnowfallLayer
 import com.watchface.idtool.ui.ToastMessage
 import com.watchface.idtool.ui.WatchFaceTheme
 import com.watchface.idtool.ui.WelcomeScreen
-import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 class MainActivity : ComponentActivity() {
@@ -213,10 +212,11 @@ private fun AppContent() {
         AppBackground()
 
         // L1 内容区：避开系统栏与输入法
-        // 注册进全局折射层：Dock/玻璃组件可一并折射滚动到此区域后方的内容
+        // 注意：此处【不能】注册 layerBackdrop——内容区包含大量玻璃组件，
+        // 把采样者放进被采样子树会造成同一 GraphicsLayer 边录边读（GL 反馈循环，
+        // RenderThread SIGSEGV 闪退）。官方架构：注册层与玻璃组件必须为兄弟节点。
         Box(
             modifier = Modifier
-                .layerBackdrop(appBackdrop)
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
