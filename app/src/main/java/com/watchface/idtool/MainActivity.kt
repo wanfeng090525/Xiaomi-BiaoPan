@@ -65,6 +65,7 @@ import com.watchface.idtool.ui.SnowfallLayer
 import com.watchface.idtool.ui.ToastMessage
 import com.watchface.idtool.ui.WatchFaceTheme
 import com.watchface.idtool.ui.WelcomeScreen
+import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 class MainActivity : ComponentActivity() {
@@ -212,8 +213,10 @@ private fun AppContent() {
         AppBackground()
 
         // L1 内容区：避开系统栏与输入法
+        // 注册进全局折射层：Dock/玻璃组件可一并折射滚动到此区域后方的内容
         Box(
             modifier = Modifier
+                .layerBackdrop(appBackdrop)
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
