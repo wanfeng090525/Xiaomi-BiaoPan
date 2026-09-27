@@ -76,6 +76,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -134,12 +135,12 @@ import java.io.File
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -1987,17 +1988,75 @@ fun GlassNavBar(
 
     // 各 Tab 位置（onGloballyPositioned 采集；坐标基于内容区，指示条同处内容区故直接对齐）
     var tabMetrics by remember { mutableStateOf(List<TabMetrics?>(tabs.size) { null }) }
-    // 滑动指示条的横向偏移与宽度动画（弹簧驱动）
-    val indicatorX = remember { Animatable(0f) }
-    val indicatorW = remember { Animatable(0f) }
 
-    // 选中项变化 → 指示条弹簧滑到目标 Tab（Dock 切换动画优化）
-    LaunchedEffect(safeIndex, tabMetrics) {
-        val m = tabMetrics.getOrNull(safeIndex) ?: return@LaunchedEffect
-        coroutineScope {
-            launch { indicatorX.animateTo(m.left.toFloat(), spring(dampingRatio = 0.66f, stiffness = 540f)) }
-            launch { indicatorW.animateTo(m.width.toFloat(), spring(dampingRatio = 0.66f, stiffness = 540f)) }
+    // 光斑（指示条）位置用「连续小数索引」表达：0.0 = 第 1 个 Tab，1.5 = 第 2、3 个之间。
+    //   · 点击切换 → 弹簧扫到目标索引（对齐视频里光斑从旧标签扫到新标签）
+    //   · 手指拖动 → snapTo 直接跟手
+    // 用单一动画量，避免位移/宽度两条动画各自为政造成的迟滞与抖动。
+    val slot = remember { Animatable(0f) }
+
+    // 拖动中：暂停「选中项驱动的弹簧」，把控制权完全交给手势，避免两个动画互相打断
+    var dragging by remember { mutableStateOf(false) }
+    // 拖动中的预览选中项：图标/文字高亮跟手，但整页切换推迟到松手提交。
+    // 拖动途中每越过一个 Tab 就切一次页会反复触发 320ms 整页转场，
+    // 页面又全是液态玻璃，这才是原来「滑动不流畅」的主因。
+    var previewIndex by remember { mutableStateOf(-1) }
+    // 手势闭包内必须读到最新值：pointerInput 只在 key 变化时重启，直接捕获
+    // safeIndex / onSelect 会读到首次组合时的旧值——这正是原来
+    //「拖动只能在前两个 Tab 之间来回」的根因。
+    val safeIndexState = rememberUpdatedState(safeIndex)
+    val onSelectState = rememberUpdatedState(onSelect)
+
+    // 高亮/光斑跟随的实际索引：拖动时跟手预览，否则跟随已提交选中项
+    val activeIndex = if (dragging && previewIndex in tabs.indices) previewIndex else safeIndex
+
+    // Tab 间距 3.dp，用于把光斑覆盖到相邻 Tab 之间的缝隙
+    val gapPx = with(density) { 3.dp.toPx() }
+
+    // 第 i 个 Tab 的「槽」左右边界（含左右半个间距 → 相邻槽首尾相接，不留空档）
+    fun slotBounds(i: Int): Pair<Float, Float> {
+        val m = tabMetrics.getOrNull(i) ?: return 0f to 0f
+        return (m.left - gapPx / 2f) to (m.left + m.width + gapPx / 2f)
+    }
+
+    // Tab 中心 x：作为「手指位置 → 连续索引」分段线性映射的锚点
+    fun centerOf(i: Int): Float {
+        val m = tabMetrics.getOrNull(i) ?: return 0f
+        return m.left + m.width / 2f
+    }
+
+    // 手指 x → 连续索引（两端钳制），保证跟手过程无跳变
+    fun indexAt(x: Float): Float {
+        for (i in 0 until tabs.size - 1) {
+            val c0 = centerOf(i)
+            val c1 = centerOf(i + 1)
+            if (x <= c1) {
+                if (c1 <= c0) return i.toFloat()
+                return i + ((x - c0) / (c1 - c0)).coerceIn(0f, 1f)
+            }
         }
+        return (tabs.size - 1).toFloat()
+    }
+
+    // 连续索引 → 光斑 rect：左右边界各自插值，宽度随相邻 Tab 宽度自然形变
+    fun indicatorRect(f: Float): Pair<Float, Float> {
+        val last = tabs.size - 1
+        val c = f.coerceIn(0f, last.toFloat())
+        val i0 = floor(c).toInt().coerceIn(0, last)
+        val i1 = (i0 + 1).coerceAtMost(last)
+        val t = c - i0
+        val (l0, r0) = slotBounds(i0)
+        val (l1, r1) = slotBounds(i1)
+        val l = l0 + (l1 - l0) * t
+        val r = r0 + (r1 - r0) * t
+        return l to (r - l)
+    }
+
+    // 选中项变化 → 光斑弹簧扫到目标 Tab；拖动期间不动，交由手势跟手
+    LaunchedEffect(safeIndex, tabMetrics, dragging) {
+        if (dragging) return@LaunchedEffect
+        if (safeIndex !in tabs.indices) return@LaunchedEffect
+        slot.animateTo(safeIndex.toFloat(), spring(dampingRatio = 0.62f, stiffness = 480f))
     }
 
     // AndroidLiquidGlass 深度对接（LiquidBottomTabs 参考规格）：
@@ -2007,8 +2066,6 @@ fun GlassNavBar(
     val tabsBackdrop = rememberLayerBackdrop()
     val indicatorBackdrop = if (appBackdrop != null) rememberCombinedBackdrop(appBackdrop, tabsBackdrop) else null
     var pressedTabIndex by remember { mutableStateOf(-1) }
-    // Dock 整体拖拽：手指滑过 Tab 即直接切页（LiquidBottomTabs 拖拽交互）
-    var dragging by remember { mutableStateOf(false) }
     val pressProgress by animateFloatAsState(
         targetValue = if (safeIndex >= 0 && (pressedTabIndex == safeIndex || dragging)) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f, visibilityThreshold = 0.001f),
@@ -2066,12 +2123,17 @@ fun GlassNavBar(
             }
         }
 
-        // 滑动高亮指示条：真实液态玻璃面板（折射背景 + Dock 内容），垫底绘制
-        if (safeIndex in tabs.indices) {
+        // 滑动高亮光斑：真实液态玻璃面板（折射背景 + Dock 内容），垫底绘制。
+        // 位置/宽度每帧由连续索引派生 → 拖动贴手、点击弹簧扫过
+        if (activeIndex in tabs.indices) {
+            val (indLeft, indWidth) = indicatorRect(slot.value)
+            // 离目标越远越「胖」，落下后收拢 → 复刻视频里光斑扫过的液态拉伸
+            val travel = abs(slot.value - activeIndex.toFloat())
+            val stretch = with(density) { (travel * 8.dp.toPx()).coerceAtMost(16.dp.toPx()) }
             Box(
                 modifier = Modifier
-                    .offset { IntOffset(indicatorX.value.roundToInt(), 0) }
-                    .width(with(density) { indicatorW.value.toDp() })
+                    .offset { IntOffset((indLeft - stretch / 2f).roundToInt(), 0) }
+                    .width(with(density) { (indWidth + stretch).toDp() })
                     .height(38.dp)
                     .then(
                         if (indicatorBackdrop != null) {
@@ -2103,37 +2165,48 @@ fun GlassNavBar(
             horizontalArrangement = Arrangement.spacedBy(3.dp),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.pointerInput(tabs.size) {
-                // 手势滑动直接切换：手指滑过 Tab 边界即切页，
-                // 指示条弹簧跟随 + 液态折射反馈；纯点击（未超过滑动阈值）仍交给 Tab 的 clickable
+                // 拖动切页：光斑与图标高亮连续跟手，松手才提交整页切换；
+                // 未超过触摸斜率仍交给 Tab 的 clickable，保证纯点击不被误判为拖动。
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    val downPos = down.position
-                    dragging = true
+                    val downX = down.position.x
+                    var isDrag = false
                     try {
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull() ?: break
                             if (!change.pressed) break
-                            // 未超过触摸斜率前不算拖拽（避免点击时双重切换/音效）
-                            if ((change.position - downPos).getDistance() <
-                                viewConfiguration.touchSlop
-                            ) continue
-                            val x = change.position.x
-                            val idx = tabMetrics.indexOfFirst { m ->
-                                m != null && x >= m.left && x < m.left + m.width
+                            if (!isDrag) {
+                                // 未超过触摸斜率前不算拖拽（避免点击时双重切换）
+                                if (abs(change.position.x - downX) <
+                                    viewConfiguration.touchSlop
+                                ) continue
+                                isDrag = true
+                                dragging = true
                             }
-                            if (idx >= 0 && idx != safeIndex) {
-                                onSelect(idx)
-                            }
+                            val f = indexAt(change.position.x)
+                            slot.snapTo(f)
+                            previewIndex = f.roundToInt().coerceIn(0, tabs.size - 1)
+                            // 消费拖动事件，避免子 Tab 的 clickable 在松手时补一次点击
+                            change.consume()
                         }
                     } finally {
-                        dragging = false
+                        if (isDrag) {
+                            // 松手才真正切页：整段拖动只触发一次整页转场，避免拖动途中抖动
+                            val target = previewIndex
+                            if (target in tabs.indices && target != safeIndexState.value) {
+                                onSelectState.value(target)
+                            }
+                            previewIndex = -1
+                            dragging = false
+                        }
                     }
                 }
             }
         ) {
             tabs.forEachIndexed { index, tab ->
-                val isSelected = index == safeIndex
+                // 用 activeIndex：拖动时图标/文字高亮跟手预览，松手提交后与选中项一致
+                val isSelected = index == activeIndex
                 val interaction = remember { MutableInteractionSource() }
                 // 按压追踪：选中 Tab 的按压进度驱动液态指示条折射/色散/放大
                 val tabPressed by interaction.collectIsPressedAsState()
@@ -2154,12 +2227,12 @@ fun GlassNavBar(
                     label = "navColor$index"
                 )
                 val contentAlpha by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.55f,
+                    targetValue = if (isSelected) 1f else 0.46f,
                     animationSpec = tween(200),
                     label = "navAlpha$index"
                 )
                 val contentScale by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.90f,
+                    targetValue = if (isSelected) 1f else 0.89f,
                     animationSpec = spring(dampingRatio = 0.55f, stiffness = 680f),
                     label = "navScale$index"
                 )
