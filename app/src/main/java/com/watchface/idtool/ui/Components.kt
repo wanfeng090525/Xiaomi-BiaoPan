@@ -2427,7 +2427,7 @@ fun DockBar(
     val activeGreen = Color(0xFF07C160)
 
     // 各 Tab 中心 x（px，相对于 Row）
-    var tabCenters by remember { mutableStateListOf<Float>().apply { repeat(tabs.size) { add(0f) } } }
+    val tabCenters = remember { mutableStateListOf<Float>().apply { repeat(tabs.size) { add(0f) } } }
 
     // 气泡弹簧滑动
     val bubbleAnim = remember { Animatable(0f) }
