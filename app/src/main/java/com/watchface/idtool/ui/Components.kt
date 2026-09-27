@@ -2161,28 +2161,16 @@ fun GlassNavBar(
                             Modifier
                         }
                     )
-                    .glow(if (dragging) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.3f), radiusFraction = 1.7f)
+                    .glow(Color.White.copy(alpha = 0.3f), radiusFraction = 1.7f)
                     .glass(
                         RoundedCornerShape(28.dp),
-                        if (dragging) {
-                            // 拖动中：黑色气泡
-                            GlassColors(
-                                tintTop = Color.Black.copy(alpha = 0.55f),
-                                tintBottom = Color.Black.copy(alpha = 0.35f),
-                                highlight = Color.White.copy(alpha = 0.15f),
-                                rimBright = Color.White.copy(alpha = 0.3f),
-                                rimDim = Color.Black.copy(alpha = 0.3f)
-                            )
-                        } else {
-                            // 默认：白色气泡
-                            GlassColors(
-                                tintTop = Color.White.copy(alpha = 0.6f),
-                                tintBottom = Color.White.copy(alpha = 0.35f),
-                                highlight = Color.White.copy(alpha = 0.6f),
-                                rimBright = Color.White.copy(alpha = 0.95f),
-                                rimDim = Color.Black.copy(alpha = 0.05f)
-                            )
-                        }
+                        GlassColors(
+                            tintTop = Color.White.copy(alpha = 0.6f),
+                            tintBottom = Color.White.copy(alpha = 0.35f),
+                            highlight = Color.White.copy(alpha = 0.6f),
+                            rimBright = Color.White.copy(alpha = 0.95f),
+                            rimDim = Color.Black.copy(alpha = 0.05f)
+                        )
                     )
             )
         }
@@ -2248,8 +2236,11 @@ fun GlassNavBar(
                 // 非选中整体收缩 + 变暗，选中项以弹簧微弹到全亮 + 原大。
                 // 选中态的玻璃指示条在底层随切换弹滑，避免"仅选中展开图标"的割裂动画。
                 val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) Color(0xFFF3F5FA)
-                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    targetValue = if (isSelected) {
+                        if (dragging) Color(0xFF1A1A1A) else Color(0xFFF3F5FA)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                    },
                     animationSpec = tween(220),
                     label = "navColor$index"
                 )
