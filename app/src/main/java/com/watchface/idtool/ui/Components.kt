@@ -1991,9 +1991,16 @@ fun GlassNavBar(
 
     // 光斑（指示条）位置用「连续小数索引」表达：0.0 = 第 1 个 Tab，1.5 = 第 2、3 个之间。
     //   · 点击切换 → 弹簧扫到目标索引（对齐视频里光斑从旧标签扫到新标签）
-    //   · 手指拖动 → snapTo 直接跟手
+    //   · 手指拖动 → 直接取手指位置的连续索引，逐帧贴手
     // 用单一动画量，避免位移/宽度两条动画各自为政造成的迟滞与抖动。
     val slot = remember { Animatable(0f) }
+    // 拖动中光斑的跟手位置（null = 未拖动）。
+    // 手势所在的 AwaitPointerEventScope 是 RestrictsSuspension 作用域，只能调用
+    // 该作用域自身的挂起函数，不能直接调 Animatable.snapTo，故跟手位置经此状态
+    // 传出，由下方 LaunchedEffect 在普通协程里落地。
+    var dragSlot by remember { mutableStateOf<Float?>(null) }
+    // 渲染用位置：拖动中贴手，否则取动画值
+    val slotValue = dragSlot ?: slot.value
 
     // 拖动中：暂停「选中项驱动的弹簧」，把控制权完全交给手势，避免两个动画互相打断
     var dragging by remember { mutableStateOf(false) }
@@ -2053,10 +2060,16 @@ fun GlassNavBar(
     }
 
     // 选中项变化 → 光斑弹簧扫到目标 Tab；拖动期间不动，交由手势跟手
-    LaunchedEffect(safeIndex, tabMetrics, dragging) {
+    LaunchedEffect(dragging, safeIndex, tabMetrics) {
         if (dragging) return@LaunchedEffect
-        if (safeIndex !in tabs.indices) return@LaunchedEffect
-        slot.animateTo(safeIndex.toFloat(), spring(dampingRatio = 0.62f, stiffness = 480f))
+        dragSlot?.let {
+            // 先把动画值对齐到手指松开处，再起步吸附，避免中间回跳一帧
+            slot.snapTo(it)
+            dragSlot = null
+        }
+        if (safeIndex in tabs.indices) {
+            slot.animateTo(safeIndex.toFloat(), spring(dampingRatio = 0.62f, stiffness = 480f))
+        }
     }
 
     // AndroidLiquidGlass 深度对接（LiquidBottomTabs 参考规格）：
@@ -2126,9 +2139,9 @@ fun GlassNavBar(
         // 滑动高亮光斑：真实液态玻璃面板（折射背景 + Dock 内容），垫底绘制。
         // 位置/宽度每帧由连续索引派生 → 拖动贴手、点击弹簧扫过
         if (activeIndex in tabs.indices) {
-            val (indLeft, indWidth) = indicatorRect(slot.value)
+            val (indLeft, indWidth) = indicatorRect(slotValue)
             // 离目标越远越「胖」，落下后收拢 → 复刻视频里光斑扫过的液态拉伸
-            val travel = abs(slot.value - activeIndex.toFloat())
+            val travel = abs(slotValue - activeIndex.toFloat())
             val stretch = with(density) { (travel * 8.dp.toPx()).coerceAtMost(16.dp.toPx()) }
             Box(
                 modifier = Modifier
@@ -2185,7 +2198,8 @@ fun GlassNavBar(
                                 dragging = true
                             }
                             val f = indexAt(change.position.x)
-                            slot.snapTo(f)
+                            // 只写状态，不做挂起调用（本作用域禁止）
+                            dragSlot = f
                             previewIndex = f.roundToInt().coerceIn(0, tabs.size - 1)
                             // 消费拖动事件，避免子 Tab 的 clickable 在松手时补一次点击
                             change.consume()
