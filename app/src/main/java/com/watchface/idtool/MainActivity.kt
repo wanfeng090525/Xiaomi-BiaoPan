@@ -311,7 +311,7 @@ private fun AppContent() {
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
             )
 
             if (isRestoring || state.isLoading) {

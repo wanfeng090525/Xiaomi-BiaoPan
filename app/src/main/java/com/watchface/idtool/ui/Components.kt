@@ -2087,6 +2087,7 @@ fun GlassNavBar(
 
     Box(
         modifier = modifier
+            .fillMaxWidth()
             .liquidGlass(
                 // G2 连续胶囊：官方 shapes 库，圆角更圆润
                 shape = Capsule(),
@@ -2100,12 +2101,12 @@ fun GlassNavBar(
                 }
             )
             .glass(RoundedCornerShape(50), rememberGlassColors())
-            .padding(horizontal = 7.dp, vertical = 7.dp)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
     ) {
         // 隐藏副本行：透明绘制进 tabsBackdrop，供指示条折射采样
         // （参考组件同款手法：副本先行绘制，保证指示条读取到当帧内容）
         Row(
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .matchParentSize()
@@ -2116,18 +2117,18 @@ fun GlassNavBar(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.height(52.dp).padding(horizontal = 8.dp)
+                    modifier = Modifier.weight(1f).height(56.dp)
                 ) {
                     Icon(
                         tab.icon,
                         contentDescription = null,
                         tint = Color(0xFFF3F5FA),
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(Modifier.height(3.dp))
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         text = tab.label,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 0.2.sp,
                         color = Color(0xFFF3F5FA),
@@ -2148,7 +2149,7 @@ fun GlassNavBar(
                 modifier = Modifier
                     .offset { IntOffset((indLeft - stretch / 2f).roundToInt(), 0) }
                     .width(with(density) { (indWidth + stretch).toDp() })
-                    .height(52.dp)
+                    .height(56.dp)
                     .then(
                         if (indicatorBackdrop != null) {
                             Modifier.liquidGlassPanel(
@@ -2162,7 +2163,7 @@ fun GlassNavBar(
                     )
                     .glow(Color.White.copy(alpha = 0.3f), radiusFraction = 1.7f)
                     .glass(
-                        RoundedCornerShape(26.dp),
+                        RoundedCornerShape(28.dp),
                         GlassColors(
                             // 白色气泡：高透明度白玻璃，深色背景上清晰可见
                             tintTop = Color.White.copy(alpha = 0.6f),
@@ -2176,7 +2177,7 @@ fun GlassNavBar(
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.pointerInput(tabs.size) {
                 // 拖动切页：光斑与图标高亮连续跟手，松手才提交整页切换；
@@ -2254,7 +2255,8 @@ fun GlassNavBar(
 
                 Box(
                     modifier = Modifier
-                        .height(52.dp)
+                        .weight(1f)
+                        .height(56.dp)
                         .onGloballyPositioned { coords ->
                             val m = TabMetrics(coords.positionInParent().x.roundToInt(), coords.size.width)
                             if (tabMetrics[index] != m) {
@@ -2263,7 +2265,7 @@ fun GlassNavBar(
                         }
                         .pressRipple(
                             interaction,
-                            clipShape = RoundedCornerShape(26.dp),
+                            clipShape = RoundedCornerShape(28.dp),
                             color = Color.White,
                             intensity = 1.1f
                         )
@@ -2271,8 +2273,7 @@ fun GlassNavBar(
                             if (!isSelected) {
                                 onSelect(index)
                             }
-                        }
-                        .padding(horizontal = 8.dp),
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -2288,12 +2289,12 @@ fun GlassNavBar(
                             tab.icon,
                             contentDescription = tab.label,
                             tint = contentColor,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(22.dp)
                         )
-                        Spacer(Modifier.height(3.dp))
+                        Spacer(Modifier.height(4.dp))
                         Text(
                             text = tab.label,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             letterSpacing = 0.2.sp,
                             color = contentColor,
