@@ -1,11 +1,16 @@
 package com.watchface.idtool.ui
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Movie
 import android.graphics.drawable.Drawable
 import android.graphics.ImageDecoder
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.view.MotionEvent
 import android.widget.ImageView
@@ -67,6 +72,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -118,13 +124,12 @@ import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.highlight.HighlightStyle
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import com.kyant.shapes.Capsule
 import com.watchface.idtool.AppSettings
 import com.watchface.idtool.BgMode
-import com.watchface.idtool.ClickSound
-import com.watchface.idtool.SoundType
 import java.io.File
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
@@ -133,6 +138,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.pow
@@ -182,11 +188,14 @@ object AppColors {
 }
 
 // ====================================================================
-// AndroidLiquidGlass（Kyant0/backdrop）真实液态玻璃接入 · v2 深度对接
+// AndroidLiquidGlass（Kyant0/backdrop）真实液态玻璃接入 · v3 深度优化
 //
-//   · LocalAppBackdrop  全局折射采样源（AppBackground + 内容区均注册）
-//   · Modifier.liquidGlass(shape)  真实折射/模糊玻璃 + painted 高光双层材质
-//   · 效果顺序遵循官方文档：colorFilter(vibrancy) ⇒ blur ⇒ lens
+//   · LocalAppBackdrop  全局折射采样源（AppBackground 注册）
+//   · Modifier.liquidGlass(shape)  真实折射 / 磨砂 / 色散玻璃
+//   · 效果顺序遵循官方文档：vibrancy ⇒ blur ⇒ lens
+//   · lens 开启 depthEffect（厚度折射）+ chromaticAberration（边缘色散）
+//   · 镜面高光由库 RuntimeShader Highlight 提供，角度随重力倾斜实时变化
+//   · 深色基底上关闭库自带 Shadow（不可见且增加 GPU 负担）
 //   · 按压缩放走 layerBlock（背景折射不跟手缩放，官方 Interactive 教程规格）
 //   · API < 31 无 RenderEffect、< 33 无 RuntimeShader 时库内部自动降级
 // ====================================================================
@@ -195,21 +204,87 @@ object AppColors {
 val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
 /**
- * 真实液态玻璃材质（官方文档 get-started / glass-bottom-bar 规格）：
- *   1. vibrancy  背景色彩 vibrancy（iOS 同款提亮）
- *   2. blur      磨砂模糊（默认 8dp，轻磨砂保通透）
- *   3. lens      边缘折射（height 16dp / amount 24dp，height ≤ 形状最小圆角半径）
+ * 液态玻璃倾斜高光：全局唯一加速计监听。
+ *
+ * 单例注册（而非每个玻璃组件各注册一个 listener），所有 liquidGlass 组件共享
+ * 同一角度状态，镜面高光方向随手机倾斜实时移动 —— iOS 液态玻璃的标志性反光。
+ * 无加速计 / 传感器不可用时角度保持默认 45°（左上受光），功能自动降级。
+ */
+object LiquidGlassTilt {
+
+    /** 高光角度（度）：atan2(y, x)，0° = 右侧受光，45° = 左上受光 */
+    val angle = mutableFloatStateOf(45f)
+
+    private var manager: SensorManager? = null
+    private var listener: SensorEventListener? = null
+
+    fun start(context: Context) {
+        if (listener != null) return
+        // 无 RuntimeShader 的机型高光完全由 painted 规格绘制，倾斜角度不参与渲染，
+        // 不注册加速计（避免无谓耗电）
+        if (!LiquidGlassShaderSupported) return
+        val m = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val accelerometer = m.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+        val l = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event == null || event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
+                val target = atan2(event.values[1], event.values[0]) * (180f / PI.toFloat())
+                // 低通滤波：抑制手持抖动，保持高光平滑
+                val alpha = 0.15f
+                angle.value = angle.value * (1f - alpha) + target * alpha
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+        m.registerListener(l, accelerometer, SensorManager.SENSOR_DELAY_UI)
+        manager = m
+        listener = l
+    }
+
+    fun stop() {
+        listener?.let { manager?.unregisterListener(it) }
+        listener = null
+        manager = null
+    }
+}
+
+/** 折射统一增益：历史逐点折射参数偏保守，放大后由形状尺寸上限兜底 */
+private const val LIQUID_LENS_GAIN = 1.4f
+
+/**
+ * 库的镜面高光 / 边缘折射（lens）依赖 API 33+ 的 RuntimeShader：
+ *   · API ≥ 33  真实折射 + 随倾斜实时转动的方向性镜面高光
+ *   · API 31-32 仅有 blur / vibrancy；折射 no-op，高光退化为一圈均匀 0.5dp 白描边
+ *   · API < 31  全部 no-op
+ * 低版本没有可用的折射高光，玻璃质感必须由 [glass] 的 painted 规格
+ * （菲涅尔顶缘亮线 + 非对称折射描边）承担，否则界面会退化成纯色色块。
+ */
+private val LiquidGlassShaderSupported: Boolean
+    get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+/**
+ * 真实液态玻璃材质（官方 get-started / ControlCenter 规格深度优化）：
+ *   1. vibrancy  背景色彩提亮（iOS 同款）
+ *   2. blur      磨砂模糊
+ *   3. lens      边缘折射：历史参数按官方比例放大，并夹在形状圆角半径内
+ *                （胶囊 / 圆形的圆角半径 = minDimension/2，故上限取 minDimension/2），
+ *                同时开启 depthEffect（厚度折射）+ chromaticAberration（边缘色散）
+ *
+ * 镜面高光由库 RuntimeShader 绘制，角度取自 [LiquidGlassTilt]（随倾斜实时变化）；
+ * 自绘描边在检出真实折射层时自动让位（见 [glass]），避免边缘双层高光发白。
  *
  * [layerBlock] 按压缩放等图形变换：变换只作用于「玻璃面板 + 内容」，
- * 背景折射保持原位（文档 Interactive 教程明确：graphicsLayer 缩放会让背景跟随缩放）。
- * 无背景层（LocalAppBackdrop 为 null）时安全降级为原 painted 玻璃。
+ * 背景折射保持原位（官方 Interactive 教程明确：graphicsLayer 缩放会让背景跟随缩放）。
+ * 无背景层（LocalAppBackdrop 为 null）时安全降级为 painted 玻璃。
  */
 @Composable
 fun Modifier.liquidGlass(
     shape: Shape,
-    blurRadius: Dp = 8.dp,
-    lensHeight: Dp = 16.dp,
-    lensAmount: Dp = 24.dp,
+    blurRadius: Dp = 12.dp,
+    lensHeight: Dp = 18.dp,
+    lensAmount: Dp = 30.dp,
+    depthEffect: Boolean = true,
+    chromaticAberration: Boolean = true,
     layerBlock: (GraphicsLayerScope.() -> Unit)? = null
 ): Modifier {
     val backdrop = LocalAppBackdrop.current ?: return this
@@ -217,10 +292,33 @@ fun Modifier.liquidGlass(
         backdrop = backdrop,
         shape = { shape },
         effects = {
+            val minDimension = size.minDimension
             vibrancy()
-            blur(blurRadius.toPx())
-            lens(refractionHeight = lensHeight.toPx(), refractionAmount = lensAmount.toPx())
+            // 磨砂：略加强并限制上限，保持通透
+            blur((blurRadius.toPx() * 1.25f).coerceAtMost(minDimension * 0.6f))
+            // 折射：放大到官方的强折射区间，上限 = 形状圆角半径（minDimension/2）
+            lens(
+                refractionHeight = (lensHeight.toPx() * LIQUID_LENS_GAIN)
+                    .coerceAtMost(minDimension * 0.5f),
+                refractionAmount = (lensAmount.toPx() * LIQUID_LENS_GAIN)
+                    .coerceAtMost(minDimension),
+                depthEffect = depthEffect,
+                chromaticAberration = chromaticAberration
+            )
         },
+        // 镜面高光：角度随重力倾斜实时转动（绘制期读取状态 → 自动失效重绘）。
+        // 无 RuntimeShader 的机型上库画不出方向性高光，只会沿轮廓描一圈均匀白边，
+        // 与 painted 顶缘亮线叠成双层描边，故直接关闭交由 [glass] 承担。
+        highlight = if (LiquidGlassShaderSupported) {
+            {
+                Highlight(
+                    alpha = 1f,
+                    style = HighlightStyle.Default(angle = LiquidGlassTilt.angle.value, falloff = 2f)
+                )
+            }
+        } else null,
+        // 深色基底上投影不可见且拖慢 GPU：关闭库自带 Shadow
+        shadow = null,
         layerBlock = layerBlock
     )
 }
@@ -293,77 +391,91 @@ fun rememberGlassColors(
 )
 
 /**
- * 液态玻璃材质绘制（v2 —— 菲涅尔折射规格）：
+ * 液态玻璃材质绘制（v3 —— 与库高光分工）：
  *
  *   1. 玻璃主体    上亮下暗的低填充底（8~15% 白）
  *   2. 顶部光泽    自上而下渐隐的镜面高光（模拟厚玻璃）
  *   3. 菲涅尔亮缘  顶边 1.5px 亮线，向两端渐隐（抛光边缘）
  *   4. 折射描边    左上受光 → 右下背光的非对称渐变描边
+ *
+ * 当所在位置存在真实折射玻璃（[LocalAppBackdrop] 非空，即同时调用了
+ * [liquidGlass]）时，3/4 的自绘描边会让位给库的 RuntimeShader Highlight
+ * （随倾斜转动的方向性镜面高光），只保留 1/2 的色调与体积层 —— 否则两套
+ * 边缘高光在轮廓上叠成「双层描边、边缘发白」的塑料感。
+ * 弹窗等无背景层场景（LocalAppBackdrop 置空）仍走完整 painted 规格兜底。
  */
+@Composable
 fun Modifier.glass(
     shape: Shape,
     colors: GlassColors,
     borderAlpha: Float = 1f,
     highlightAlpha: Float = 1f
-): Modifier = this.drawBehind {
-    val outline = shape.createOutline(size, layoutDirection, this)
+): Modifier {
+    // 仅当库真能画出方向性折射高光（API 33+ RuntimeShader）时自绘描边才让位；
+    // 低版本库的 lens/highlight 全部降级，必须保留完整 painted 规格
+    val hasRefraction = LiquidGlassShaderSupported && LocalAppBackdrop.current != null
+    return this.drawBehind {
+        val outline = shape.createOutline(size, layoutDirection, this)
 
-    // 统一裁剪到圆角轮廓内绘制：描边/高光一律不越出圆角边界，
-    // 根治深色背景下小尺寸图标「四角白色残留 / 方形轮廓」渲染缺陷
-    //（双描边沿轮廓线居中绘制时，外侧一半会透出圆角边界叠加成残影）
-    val outlinePath = Path().apply { addOutline(outline) }
-    clipPath(outlinePath) {
-        // 1. 玻璃主体
-        drawOutline(
-            outline = outline,
-            brush = Brush.verticalGradient(
-                colors = listOf(colors.tintTop, colors.tintBottom),
-                startY = 0f,
-                endY = size.height
+        // 统一裁剪到圆角轮廓内绘制：描边/高光一律不越出圆角边界，
+        // 根治深色背景下小尺寸图标「四角白色残留 / 方形轮廓」渲染缺陷
+        //（双描边沿轮廓线居中绘制时，外侧一半会透出圆角边界叠加成残影）
+        val outlinePath = Path().apply { addOutline(outline) }
+        clipPath(outlinePath) {
+            // 1. 玻璃主体
+            drawOutline(
+                outline = outline,
+                brush = Brush.verticalGradient(
+                    colors = listOf(colors.tintTop, colors.tintBottom),
+                    startY = 0f,
+                    endY = size.height
+                )
             )
-        )
 
-        // 2. 顶部液态光泽（厚玻璃体积感）
-        drawOutline(
-            outline = outline,
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    colors.highlight.copy(alpha = colors.highlight.alpha * 0.42f * highlightAlpha),
-                    Color.Transparent
-                ),
-                startY = 0f,
-                endY = size.height * 0.45f
+            // 2. 顶部液态光泽（厚玻璃体积感）
+            drawOutline(
+                outline = outline,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        colors.highlight.copy(alpha = colors.highlight.alpha * 0.42f * highlightAlpha),
+                        Color.Transparent
+                    ),
+                    startY = 0f,
+                    endY = size.height * 0.45f
+                )
             )
-        )
 
-        // 3. 菲涅尔顶缘亮线：顶部中段最亮、向两侧渐隐的抛光边缘
-        drawOutline(
-            outline = outline,
-            brush = Brush.horizontalGradient(
-                colors = listOf(
-                    colors.rimBright.copy(alpha = 0f),
-                    colors.rimBright.copy(alpha = colors.rimBright.alpha * 0.85f * borderAlpha),
-                    colors.rimBright.copy(alpha = 0f)
-                ),
-                startX = 0f,
-                endX = size.width
-            ),
-            style = Stroke(width = 1.5.dp.toPx())
-        )
+            if (!hasRefraction) {
+                // 3. 菲涅尔顶缘亮线：顶部中段最亮、向两侧渐隐的抛光边缘
+                drawOutline(
+                    outline = outline,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            colors.rimBright.copy(alpha = 0f),
+                            colors.rimBright.copy(alpha = colors.rimBright.alpha * 0.85f * borderAlpha),
+                            colors.rimBright.copy(alpha = 0f)
+                        ),
+                        startX = 0f,
+                        endX = size.width
+                    ),
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
 
-        // 4. 非对称折射描边：左上受光、右下背光
-        drawOutline(
-            outline = outline,
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    colors.rimBright.copy(alpha = colors.rimBright.alpha * 0.65f * borderAlpha),
-                    colors.rimDim.copy(alpha = colors.rimDim.alpha * 0.9f * borderAlpha)
-                ),
-                start = Offset(0f, 0f),
-                end = Offset(size.width, size.height)
-            ),
-            style = Stroke(width = 1.dp.toPx())
-        )
+                // 4. 非对称折射描边：左上受光、右下背光
+                drawOutline(
+                    outline = outline,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            colors.rimBright.copy(alpha = colors.rimBright.alpha * 0.65f * borderAlpha),
+                            colors.rimDim.copy(alpha = colors.rimDim.alpha * 0.9f * borderAlpha)
+                        ),
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, size.height)
+                    ),
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            }
+        }
     }
 }
 
@@ -399,7 +511,7 @@ fun Modifier.glassShadow(
 // ====================================================================
 // 液态玻璃拉条（GlassSlider · iOS 液态风格）
 //   · 玻璃渐变轨道 + 高光填充 + 圆形发光玻璃滑块
-//   · 拖动跟手、松手弹簧归位；跨档位触发点击音效（可关闭）
+//   · 拖动跟手、松手弹簧归位
 // ====================================================================
 
 @Composable
@@ -409,10 +521,8 @@ fun GlassSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
     onValueChangeFinished: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-    playSound: Boolean = true
+    modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val density = LocalDensity.current
     val min = valueRange.start
     val max = valueRange.endInclusive
@@ -527,27 +637,17 @@ fun GlassSlider(
             modifier = Modifier
                 .fillMaxWidth()
                 .matchParentSize()
-                .pointerInput(intervals, playSound) {
+                .pointerInput(intervals) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         dragging = true
                         fun fracOf(x: Float): Float =
                             (x / trackW.coerceAtLeast(1f)).coerceIn(0f, 1f)
 
-                        var lastTick = (fracOf(down.position.x) * intervals).roundToInt()
-                        fun playStepIfChanged(x: Float) {
-                            if (!playSound || steps <= 0) return
-                            val tick = (fracOf(x) * intervals).roundToInt()
-                            if (tick != lastTick) {
-                                lastTick = tick
-                                ClickSound.play(context, SoundType.SLIDER)
-                            }
-                        }
                         onValueChange(valueFromFraction(fracOf(down.position.x)))
                         drag(down.id) { change ->
                             change.consume()
                             val f = fracOf(change.position.x)
-                            playStepIfChanged(change.position.x)
                             onValueChange(valueFromFraction(f))
                         }
                         dragging = false
@@ -1397,14 +1497,12 @@ fun GlobalRippleOverlay(modifier: Modifier = Modifier) {
         label = "globalRippleTickT"
     )
 
-    // View 层观察者：只在 ACTION_DOWN 记录触点并播放点击音效，永不消费事件
+    // View 层观察者：只在 ACTION_DOWN 记录触点，永不消费事件
     val view = LocalView.current
     DisposableEffect(view) {
         val listener = android.view.View.OnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                 ripples.add(EnergyRipple(event.x, event.y, System.nanoTime()))
-                // 点击音效（设置开关控制，60ms 节流）
-                ClickSound.play(view.context)
                 // 防御上限：避免极端连点堆积
                 if (ripples.size > 10) ripples.removeAt(0)
             }
@@ -1513,13 +1611,11 @@ fun GlassCard(
     tintTop: Color? = null,
     tintBottom: Color? = null,
     contentPadding: Dp = 16.dp,
-    haptic: Boolean = true,
     shadowElevation: Dp = 7.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val colors = rememberGlassColors(tintTop, tintBottom)
     val clickInteraction = remember(onClick != null) { MutableInteractionSource() }
-    val cardContext = LocalContext.current
     // 按压进度：走 liquidGlass 的 layerBlock 缩放玻璃面板，
     // 背景折射保持原位（graphicsLayer 缩放会让折射背景跟随缩放，官方文档禁止）
     val cardPressed by clickInteraction.collectIsPressedAsState()
@@ -1531,9 +1627,6 @@ fun GlassCard(
     val base = if (onClick != null) {
         Modifier
             .clickable(interactionSource = clickInteraction, indication = null) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(cardContext)
-                }
                 onClick()
             }
             .pressRipple(clickInteraction, clipShape = shape, intensity = 1.1f)
@@ -1584,7 +1677,6 @@ fun GlassButton(
     shimmer: Boolean = true
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val context = LocalContext.current
     val shape = RoundedCornerShape(50)
     // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
     val pressed by interaction.collectIsPressedAsState()
@@ -1653,9 +1745,6 @@ fun GlassButton(
                 intensity = 1.15f
             )
             .clickable(interactionSource = interaction, indication = null) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(context)
-                }
                 onClick()
             },
         contentAlignment = Alignment.Center
@@ -1699,7 +1788,6 @@ fun GlassIconButton(
     tintBottom: Color? = null
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val context = LocalContext.current
     // 图标无彩色规格：容器与图标统一中性白玻璃
     val colors = rememberGlassColors()
     // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
@@ -1727,9 +1815,6 @@ fun GlassIconButton(
             .glass(CircleShape, colors)
             .pressRipple(interaction, clipShape = CircleShape, color = tint, intensity = 1.2f)
             .clickable(interactionSource = interaction, indication = null) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(context)
-                }
                 onClick()
             },
         contentAlignment = Alignment.Center
@@ -1755,7 +1840,6 @@ fun GlassChip(
     modifier: Modifier = Modifier
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val context = LocalContext.current
     val shape = RoundedCornerShape(50)
     // 单色系规格：选中态为高亮白玻璃，不使用主题色
     val active = Color.White
@@ -1846,9 +1930,6 @@ fun GlassChip(
                 intensity = 1.05f
             )
             .clickable(interactionSource = interaction, indication = null) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(context)
-                }
                 onClick()
             }
             .padding(vertical = 9.dp, horizontal = 14.dp),
@@ -1900,7 +1981,6 @@ fun GlassNavBar(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val navContext = LocalContext.current
     // -1 = 无选中（当前页由卫星按钮承载，如设置页）
     val safeIndex = if (selected in tabs.indices) selected else -1
     val density = LocalDensity.current
@@ -2043,7 +2123,6 @@ fun GlassNavBar(
                                 m != null && x >= m.left && x < m.left + m.width
                             }
                             if (idx >= 0 && idx != safeIndex) {
-                                ClickSound.play(navContext, SoundType.TOGGLE)
                                 onSelect(idx)
                             }
                         }
@@ -2102,7 +2181,6 @@ fun GlassNavBar(
                         )
                         .clickable(interactionSource = interaction, indication = null) {
                             if (!isSelected) {
-                                ClickSound.play(navContext, SoundType.TOGGLE)
                                 onSelect(index)
                             }
                         }
@@ -2157,7 +2235,6 @@ fun GlassFabButton(
     size: Dp = 46.dp,
     iconSize: Dp = 20.dp
 ) {
-    val context = LocalContext.current
     val interaction = remember { MutableInteractionSource() }
     val iconColor by animateColorAsState(
         targetValue = if (selected) Color(0xFFF3F5FA)
@@ -2221,9 +2298,6 @@ fun GlassFabButton(
                 intensity = 1.25f
             )
             .clickable(interactionSource = interaction, indication = null) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(context)
-                }
                 onClick()
             },
         contentAlignment = Alignment.Center

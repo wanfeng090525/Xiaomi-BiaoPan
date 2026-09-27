@@ -92,9 +92,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
- import com.watchface.idtool.AppSettings
  import com.watchface.idtool.BuildConfig
- import com.watchface.idtool.ClickSound
  import com.watchface.idtool.HitokotoApi
 import com.watchface.idtool.ImportedFile
 import com.watchface.idtool.LogKeyExtractor
@@ -505,8 +503,6 @@ private fun QuickTile(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val tileContext = androidx.compose.ui.platform.LocalContext.current
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
     val tilePressed by interaction.collectIsPressedAsState()
@@ -536,12 +532,6 @@ private fun QuickTile(
                 interactionSource = interaction,
                 indication = null
             ) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(tileContext)
-                    haptics.performHapticFeedback(
-                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
-                    )
-                }
                 onClick()
             }
             .padding(horizontal = 14.dp, vertical = 12.dp)
@@ -679,8 +669,6 @@ private fun HitokotoBar() {
         label = "hitokotoSpin"
     )
     val interaction = remember { MutableInteractionSource() }
-    val hitokotoContext = androidx.compose.ui.platform.LocalContext.current
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val timeColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.92f)
 
     Column(
@@ -700,12 +688,6 @@ private fun HitokotoBar() {
                 )
             )
             .clickable(interactionSource = interaction, indication = null) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(hitokotoContext)
-                    haptics.performHapticFeedback(
-                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
-                    )
-                }
                 refresh()
             }
             .padding(horizontal = 20.dp, vertical = 15.dp)
@@ -1534,8 +1516,6 @@ private fun KeyExtractionTile(
     onExtract: () -> Unit,
     onClear: () -> Unit
 ) {
-    val clickContext = androidx.compose.ui.platform.LocalContext.current
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val isExtracting = state.isExtracting
 
@@ -1550,12 +1530,6 @@ private fun KeyExtractionTile(
                 interactionSource = interaction,
                 indication = null
             ) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(clickContext)
-                    haptics.performHapticFeedback(
-                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
-                    )
-                }
                 if (!isExtracting) {
                     if (state.extractResult != null) {
                         onClear()
@@ -1856,8 +1830,6 @@ private fun KeyRow(
     isCopied: Boolean,
     onCopy: () -> Unit
 ) {
-    val clickContext = androidx.compose.ui.platform.LocalContext.current
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
 
     // 只展示设备名称，不拼接型号
@@ -1879,12 +1851,6 @@ private fun KeyRow(
                 interactionSource = interaction,
                 indication = null
             ) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(clickContext)
-                    haptics.performHapticFeedback(
-                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
-                    )
-                }
                 onCopy()
             }
             .padding(horizontal = 10.dp, vertical = 8.dp),

@@ -80,8 +80,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.watchface.idtool.ClickSound
-import com.watchface.idtool.AppSettings
 import com.watchface.idtool.MainViewModel
 import com.watchface.idtool.RecordStore
 import com.watchface.idtool.UiState
@@ -408,7 +406,6 @@ private fun FileDropCard(
     hasFile: Boolean,
     onClick: () -> Unit
 ) {
-    val context = LocalContext.current
     val interaction = remember { MutableInteractionSource() }
 
     val success = AppColors.successAdaptive()
@@ -461,9 +458,6 @@ private fun FileDropCard(
             }
             .pressRipple(interaction, clipShape = shape, color = if (hasFile) Color(0xFFE9EBF4) else Color(0xFFD9DEEB), intensity = 1.15f)
             .clickable(interactionSource = interaction, indication = null) {
-                if (AppSettings.soundEnabled) {
-                    ClickSound.play(context)
-                }
                 onClick()
             }
             .padding(vertical = 22.dp, horizontal = 16.dp),
@@ -891,8 +885,6 @@ internal fun GlassToolCard(
 ) {
     GlassCard(
         onClick = {
-            if (AppSettings.soundEnabled) {
-            }
             onClick()
         },
         shape = RoundedCornerShape(18.dp),

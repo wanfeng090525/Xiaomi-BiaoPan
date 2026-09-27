@@ -36,14 +36,12 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -167,7 +165,6 @@ fun SettingsScreen(
         StaggeredItem(index = 5) { SectionLabel("界面与语言") }
         Spacer(Modifier.height(10.dp))
         StaggeredItem(index = 4) {
-            val context = LocalContext.current
             val savedLang = AppLocale.savedLang
             val langNative = AppLocale.LOCALES.firstOrNull { it.code == savedLang }?.native ?: "简体中文"
             GlassCard(contentPadding = 6.dp) {
@@ -181,23 +178,6 @@ fun SettingsScreen(
                 SettingsDivider()
                 // 显示密度拉条：80% ~ 110%，实时百分比
                 DensitySliderRow()
-                SettingsDivider()
-                SettingsSwitchRow(
-                    icon = Icons.Default.MusicNote,
-                    title = "点击音效",
-                    subtitle = "按钮与开关点击时的声音反馈",
-                    checked = AppSettings.soundEnabled,
-                    onCheckedChange = { AppSettings.setSoundEnabled(context, it) }
-                )
-                SettingsDivider()
-                // 震动效果开关：独立于音效，不同控件触发不同震动节奏（适配按钮控件）
-                SettingsSwitchRow(
-                    icon = Icons.Default.Vibration,
-                    title = "震动效果",
-                    subtitle = "不同控件适配不同震动节奏",
-                    checked = AppSettings.vibrationEnabled,
-                    onCheckedChange = { AppSettings.setVibrationEnabled(context, it) }
-                )
             }
         }
 
@@ -530,8 +510,7 @@ private fun SettingsRow(
     GlassCard(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
-        contentPadding = 13.dp,
-        haptic = false
+        contentPadding = 13.dp
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -592,7 +571,6 @@ private fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -619,9 +597,6 @@ private fun SettingsSwitchRow(
         Switch(
             checked = checked,
             onCheckedChange = { next ->
-                if (AppSettings.soundEnabled) {
-                    com.watchface.idtool.ClickSound.play(context, com.watchface.idtool.SoundType.TOGGLE)
-                }
                 onCheckedChange(next)
             },
             colors = SwitchDefaults.colors(
@@ -1006,8 +981,7 @@ private fun LanguageDialog(
                         GlassCard(
                             onClick = { onSelect(locale.code) },
                             shape = RoundedCornerShape(18.dp),
-                            contentPadding = 13.dp,
-                            haptic = false
+                            contentPadding = 13.dp
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1090,8 +1064,7 @@ private fun BgStyleDialog(
                     GlassCard(
                         onClick = opt.action,
                         shape = RoundedCornerShape(18.dp),
-                        contentPadding = 13.dp,
-                        haptic = false
+                        contentPadding = 13.dp
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
