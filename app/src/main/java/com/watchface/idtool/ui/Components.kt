@@ -2142,9 +2142,9 @@ fun GlassNavBar(
         // 位置/宽度每帧由连续索引派生 → 拖动贴手、点击弹簧扫过
         if (activeIndex in tabs.indices) {
             val (indLeft, indWidth) = indicatorRect(slotValue)
-            // 离目标越远越「胖」，落下后收拢 → 复刻视频里光斑扫过的液态拉伸
+            // 离目标越远越拉伸，横跨两个Tab → 复刻视频里气泡拉长效果
             val travel = abs(slotValue - activeIndex.toFloat())
-            val stretch = with(density) { (travel * 8.dp.toPx()).coerceAtMost(16.dp.toPx()) }
+            val stretch = with(density) { (travel * 70.dp.toPx()).coerceAtMost(80.dp.toPx()) }
             Box(
                 modifier = Modifier
                     .offset { IntOffset((indLeft - stretch / 2f).roundToInt(), 0) }
