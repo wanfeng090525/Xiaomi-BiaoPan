@@ -2160,16 +2160,16 @@ fun GlassNavBar(
                             Modifier
                         }
                     )
-                    .glow(Color.White.copy(alpha = 0.18f), radiusFraction = 1.7f)
+                    .glow(Color.White.copy(alpha = 0.25f), radiusFraction = 1.7f)
                     .glass(
                         RoundedCornerShape(26.dp),
                         GlassColors(
-                            // 提亮玻璃规格：半透明白玻璃 + 亮边环 + 浅色内容（与原选中态一致）
-                            tintTop = Color.White.copy(alpha = 0.24f),
-                            tintBottom = Color.White.copy(alpha = 0.10f),
-                            highlight = Color.White.copy(alpha = 0.40f),
-                            rimBright = Color.White.copy(alpha = 0.78f),
-                            rimDim = Color.Black.copy(alpha = 0.12f)
+                            // 白色气泡：高亮白玻璃，深色背景上清晰可见
+                            tintTop = Color.White.copy(alpha = 0.45f),
+                            tintBottom = Color.White.copy(alpha = 0.25f),
+                            highlight = Color.White.copy(alpha = 0.55f),
+                            rimBright = Color.White.copy(alpha = 0.9f),
+                            rimDim = Color.Black.copy(alpha = 0.08f)
                         )
                     )
             )
