@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -49,8 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.math.roundToInt
 import com.watchface.idtool.ui.AppBackground
-import com.watchface.idtool.ui.DockBar
-import com.watchface.idtool.ui.DockTab
+import com.watchface.idtool.ui.GlassNavTab
+import com.watchface.idtool.ui.GlassNavBar
 import com.watchface.idtool.ui.GlobalRippleOverlay
 import com.watchface.idtool.ui.HistoryScreen
 import com.watchface.idtool.ui.LoadingOverlay
@@ -285,13 +284,13 @@ private fun AppContent() {
                 }
             }
 
-            // L2 悬浮 Dock 栏（参考视频样式：白色浮岛 + 中间绿色 + 按钮）
-            DockBar(
+            // L2 悬浮玻璃导航栏（垂直布局：图标在上文字在下）
+            GlassNavBar(
                 tabs = listOf(
-                    DockTab(Icons.Default.Home, "主页"),
-                    DockTab(Icons.Default.Build, "修改"),
-                    DockTab(Icons.Default.History, "记录"),
-                    DockTab(Icons.Default.Settings, "设置")
+                    GlassNavTab(Icons.Default.Home, "主页"),
+                    GlassNavTab(Icons.Default.Build, "修改"),
+                    GlassNavTab(Icons.Default.History, "记录"),
+                    GlassNavTab(Icons.Default.Settings, "设置")
                 ),
                 selected = when (currentPage) {
                     "home" -> 0
@@ -310,12 +309,9 @@ private fun AppContent() {
                         }
                     )
                 },
-                centerIcon = Icons.Default.Add,
-                centerContentDescription = "修改",
-                onCenterClick = { switchPage("modify") },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 14.dp)
+                    .padding(bottom = 12.dp)
             )
 
             if (isRestoring || state.isLoading) {

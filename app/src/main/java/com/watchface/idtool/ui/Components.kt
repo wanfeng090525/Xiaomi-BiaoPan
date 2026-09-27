@@ -2113,20 +2113,21 @@ fun GlassNavBar(
                 .layerBackdrop(tabsBackdrop)
         ) {
             tabs.forEachIndexed { _, tab ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.height(38.dp).padding(horizontal = 13.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.height(52.dp).padding(horizontal = 8.dp)
                 ) {
                     Icon(
                         tab.icon,
                         contentDescription = null,
                         tint = Color(0xFFF3F5FA),
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(19.dp)
                     )
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.height(3.dp))
                     Text(
                         text = tab.label,
-                        fontSize = 13.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 0.2.sp,
                         color = Color(0xFFF3F5FA),
@@ -2147,7 +2148,7 @@ fun GlassNavBar(
                 modifier = Modifier
                     .offset { IntOffset((indLeft - stretch / 2f).roundToInt(), 0) }
                     .width(with(density) { (indWidth + stretch).toDp() })
-                    .height(38.dp)
+                    .height(52.dp)
                     .then(
                         if (indicatorBackdrop != null) {
                             Modifier.liquidGlassPanel(
@@ -2161,7 +2162,7 @@ fun GlassNavBar(
                     )
                     .glow(Color.White.copy(alpha = 0.18f), radiusFraction = 1.7f)
                     .glass(
-                        RoundedCornerShape(19.dp),
+                        RoundedCornerShape(26.dp),
                         GlassColors(
                             // 提亮玻璃规格：半透明白玻璃 + 亮边环 + 浅色内容（与原选中态一致）
                             tintTop = Color.White.copy(alpha = 0.24f),
@@ -2253,7 +2254,7 @@ fun GlassNavBar(
 
                 Box(
                     modifier = Modifier
-                        .height(38.dp)
+                        .height(52.dp)
                         .onGloballyPositioned { coords ->
                             val m = TabMetrics(coords.positionInParent().x.roundToInt(), coords.size.width)
                             if (tabMetrics[index] != m) {
@@ -2262,7 +2263,7 @@ fun GlassNavBar(
                         }
                         .pressRipple(
                             interaction,
-                            clipShape = RoundedCornerShape(19.dp),
+                            clipShape = RoundedCornerShape(26.dp),
                             color = Color.White,
                             intensity = 1.1f
                         )
@@ -2271,11 +2272,12 @@ fun GlassNavBar(
                                 onSelect(index)
                             }
                         }
-                        .padding(horizontal = 13.dp),
+                        .padding(horizontal = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                         modifier = Modifier.graphicsLayer {
                             scaleX = contentScale
                             scaleY = contentScale
@@ -2286,12 +2288,12 @@ fun GlassNavBar(
                             tab.icon,
                             contentDescription = tab.label,
                             tint = contentColor,
-                            modifier = Modifier.size(17.dp)
+                            modifier = Modifier.size(19.dp)
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.height(3.dp))
                         Text(
                             text = tab.label,
-                            fontSize = 13.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
                             letterSpacing = 0.2.sp,
                             color = contentColor,
