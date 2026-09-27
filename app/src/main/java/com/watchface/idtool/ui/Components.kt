@@ -2401,6 +2401,216 @@ fun GlassFabButton(
 }
 
 // ====================================================================
+// 悬浮 Dock 栏（参考视频样式 · 液态玻璃）
+//
+//   · 液态玻璃胶囊浮岛，底部悬浮
+//   · 垂直布局：图标在上、文字在下
+//   · 选中项：高亮玻璃圆形气泡随切换滑动
+//   · 中间：绿色实心胶囊 + 主操作按钮
+// ====================================================================
+
+data class DockTab(val icon: ImageVector, val label: String)
+
+@Composable
+fun DockBar(
+    tabs: List<DockTab>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    centerIcon: ImageVector,
+    centerContentDescription: String,
+    onCenterClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val safeIndex = if (selected in tabs.indices) selected else -1
+    val bubbleSize = 48.dp
+    val activeGreen = Color(0xFF07C160)
+
+    // 各 Tab 中心 x（px，相对于 Row）
+    var tabCenters by remember { mutableStateListOf<Float>().apply { repeat(tabs.size) { add(0f) } } }
+
+    // 气泡弹簧滑动
+    val bubbleAnim = remember { Animatable(0f) }
+    LaunchedEffect(safeIndex, tabCenters.toList()) {
+        if (safeIndex >= 0 && tabCenters[safeIndex] > 0f) {
+            bubbleAnim.animateTo(
+                tabCenters[safeIndex],
+                spring(dampingRatio = 0.62f, stiffness = 480f)
+            )
+        }
+    }
+
+    // 液态玻璃折射层（与 GlassNavBar 同款架构）
+    val appBackdrop = LocalAppBackdrop.current
+    val tabsBackdrop = rememberLayerBackdrop()
+    val indicatorBackdrop = if (appBackdrop != null) rememberCombinedBackdrop(appBackdrop, tabsBackdrop) else null
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(68.dp)
+            .liquidGlass(
+                shape = Capsule(),
+                blurRadius = 8.dp,
+                lensHeight = 20.dp,
+                lensAmount = 24.dp
+            )
+            .glass(RoundedCornerShape(50), rememberGlassColors())
+            .padding(horizontal = 5.dp, vertical = 6.dp)
+    ) {
+        // 隐藏副本：录制进 tabsBackdrop 供气泡折射采样
+        Row(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = 0f }
+                .layerBackdrop(tabsBackdrop),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.take(2).forEachIndexed { index, tab ->
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    DockTabColumn(tab = tab, selected = index == safeIndex)
+                }
+            }
+            Box(Modifier.size(width = 56.dp, height = 44.dp))
+            tabs.drop(2).forEachIndexed { offset, tab ->
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    DockTabColumn(tab = tab, selected = offset + 2 == safeIndex)
+                }
+            }
+        }
+
+        // 滑动玻璃气泡
+        if (safeIndex >= 0) {
+            Box(
+                modifier = Modifier
+                    .offset {
+                        IntOffset(
+                            x = (bubbleAnim.value - with(density) { (bubbleSize / 2).toPx() }).roundToInt(),
+                            y = 0
+                        )
+                    }
+                    .size(bubbleSize)
+                    .align(Alignment.CenterStart)
+                    .then(
+                        if (indicatorBackdrop != null) {
+                            Modifier.liquidGlassPanel(
+                                backdrop = indicatorBackdrop,
+                                shape = CircleShape,
+                                pressProgress = { 1f }
+                            )
+                        } else Modifier
+                    )
+                    .glow(Color.White.copy(alpha = 0.15f), radiusFraction = 1.5f)
+                    .glass(
+                        CircleShape,
+                        GlassColors(
+                            tintTop = Color.White.copy(alpha = 0.24f),
+                            tintBottom = Color.White.copy(alpha = 0.10f),
+                            highlight = Color.White.copy(alpha = 0.40f),
+                            rimBright = Color.White.copy(alpha = 0.75f),
+                            rimDim = Color.Black.copy(alpha = 0.12f)
+                        )
+                    )
+            )
+        }
+
+        // 可见行
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.take(2).forEachIndexed { index, tab ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .onGloballyPositioned { coords ->
+                            val cx = coords.positionInParent().x + coords.size.width / 2f
+                            if (tabCenters[index] != cx) tabCenters[index] = cx
+                        }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onSelect(index) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    DockTabColumn(tab = tab, selected = index == safeIndex)
+                }
+            }
+
+            // 中间绿色实心胶囊按钮
+            Box(
+                modifier = Modifier
+                    .size(width = 56.dp, height = 44.dp)
+                    .glow(activeGreen.copy(alpha = 0.45f), radiusFraction = 1.3f)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(activeGreen)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onCenterClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    centerIcon,
+                    contentDescription = centerContentDescription,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            tabs.drop(2).forEachIndexed { offset, tab ->
+                val index = offset + 2
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .onGloballyPositioned { coords ->
+                            val cx = coords.positionInParent().x + coords.size.width / 2f
+                            if (tabCenters[index] != cx) tabCenters[index] = cx
+                        }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onSelect(index) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    DockTabColumn(tab = tab, selected = index == safeIndex)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DockTabColumn(tab: DockTab, selected: Boolean) {
+    val color by animateColorAsState(
+        targetValue = if (selected) Color(0xFFF3F5FA)
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
+        animationSpec = tween(220),
+        label = "dockTabColor"
+    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            tab.icon,
+            contentDescription = tab.label,
+            tint = color,
+            modifier = Modifier.size(19.dp)
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = tab.label,
+            fontSize = 10.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            color = color,
+            maxLines = 1
+        )
+    }
+}
+
+// ====================================================================
 // 交错入场动画
 // ====================================================================
 
