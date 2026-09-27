@@ -2237,13 +2237,13 @@ fun GlassNavBar(
                 // 非选中整体收缩 + 变暗，选中项以弹簧微弹到全亮 + 原大。
                 // 选中态的玻璃指示条在底层随切换弹滑，避免"仅选中展开图标"的割裂动画。
                 val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) Color(0xFF07C160)
-                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    targetValue = if (isSelected) Color(0xFFF3F5FA)
+                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                     animationSpec = tween(220),
                     label = "navColor$index"
                 )
                 val contentAlpha by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.55f,
+                    targetValue = if (isSelected) 1f else 0.46f,
                     animationSpec = tween(200),
                     label = "navAlpha$index"
                 )
