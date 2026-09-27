@@ -135,9 +135,6 @@ class MainActivity : ComponentActivity() {
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(WindowInsetsCompat.Type.systemBars())
 
-        // 预加载点击音效（首次点击零延迟）
-        ClickSound.ensureLoaded(this)
-
         setContent {
             WatchFaceTheme {
                 AppContent()
@@ -156,6 +153,32 @@ private fun AppContent() {
     val state by viewModel.uiState.collectAsState()
     var currentPage by remember { mutableStateOf("home") }
     val context = LocalContext.current
+
+    // 液态玻璃倾斜高光：全局单例加速计监听，玻璃镜面高光角度随手机倾斜实时变化。
+    // 仅前台采集（后台停止，避免无谓耗电）；不支持 RuntimeShader 的机型内部自动跳过。
+    val tiltLifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(tiltLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME ->
+                    com.watchface.idtool.ui.LiquidGlassTilt.start(context)
+
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE ->
+                    com.watchface.idtool.ui.LiquidGlassTilt.stop()
+
+                else -> Unit
+            }
+        }
+        tiltLifecycleOwner.lifecycle.addObserver(observer)
+        // 首次组合时可能已处于 RESUMED（不会再次收到 ON_RESUME），补一次启动
+        if (tiltLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            com.watchface.idtool.ui.LiquidGlassTilt.start(context)
+        }
+        onDispose {
+            tiltLifecycleOwner.lifecycle.removeObserver(observer)
+            com.watchface.idtool.ui.LiquidGlassTilt.stop()
+        }
+    }
 
     // 恢复本地卡密登录态：首次启动后台异步验证，完成后自动登录
     androidx.compose.runtime.LaunchedEffect(Unit) {

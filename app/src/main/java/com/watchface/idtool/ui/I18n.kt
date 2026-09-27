@@ -128,8 +128,6 @@ object AppLocale {
         "系统默认设置" to "System default",
         "启动时显示公告" to "Show announcement on launch",
         "启动 App 时自动弹出新公告" to "Auto-popup new announcements at launch",
-        "点击音效" to "Tap sound",
-        "轻快的液态玻璃触感音效" to "Light liquid-glass tap feedback",
         "已是最新版本" to "Already up to date",
         "检查超时，请稍后重试" to "Timed out, try again later",
         "网络不可用或配置获取失败" to "Network unavailable or fetch failed",
@@ -245,7 +243,6 @@ object AppLocale {
         "导出时间:" to "Exported:", "表盘名称:" to "Name:",
         "表盘 ID 修改记录" to "Watchface ID History",
         "总记录数: {0}" to "Total records: {0}",
-        "音效与振动反馈，关闭后完全静默" to "Sound & haptic feedback; fully silent when off",
         // 时长
         "0 秒" to "0s", "{0} 秒" to "{0}s", "{0} 分钟" to "{0}m", "{0} 分 {1} 秒" to "{0}m {1}s",
         // 密钥提取
