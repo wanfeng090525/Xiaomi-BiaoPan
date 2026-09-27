@@ -2161,17 +2161,28 @@ fun GlassNavBar(
                             Modifier
                         }
                     )
-                    .glow(Color.White.copy(alpha = 0.3f), radiusFraction = 1.7f)
+                    .glow(if (dragging) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.3f), radiusFraction = 1.7f)
                     .glass(
                         RoundedCornerShape(28.dp),
-                        GlassColors(
-                            // 白色气泡：高透明度白玻璃，深色背景上清晰可见
-                            tintTop = Color.White.copy(alpha = 0.6f),
-                            tintBottom = Color.White.copy(alpha = 0.35f),
-                            highlight = Color.White.copy(alpha = 0.6f),
-                            rimBright = Color.White.copy(alpha = 0.95f),
-                            rimDim = Color.Black.copy(alpha = 0.05f)
-                        )
+                        if (dragging) {
+                            // 拖动中：黑色气泡
+                            GlassColors(
+                                tintTop = Color.Black.copy(alpha = 0.55f),
+                                tintBottom = Color.Black.copy(alpha = 0.35f),
+                                highlight = Color.White.copy(alpha = 0.15f),
+                                rimBright = Color.White.copy(alpha = 0.3f),
+                                rimDim = Color.Black.copy(alpha = 0.3f)
+                            )
+                        } else {
+                            // 默认：白色气泡
+                            GlassColors(
+                                tintTop = Color.White.copy(alpha = 0.6f),
+                                tintBottom = Color.White.copy(alpha = 0.35f),
+                                highlight = Color.White.copy(alpha = 0.6f),
+                                rimBright = Color.White.copy(alpha = 0.95f),
+                                rimDim = Color.Black.copy(alpha = 0.05f)
+                            )
+                        }
                     )
             )
         }
