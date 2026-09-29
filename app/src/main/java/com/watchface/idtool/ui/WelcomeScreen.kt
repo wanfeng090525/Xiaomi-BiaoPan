@@ -1159,7 +1159,12 @@ internal fun UpdateDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1164f / 860f),
-                    majorVersion = latestVersion.substringBefore('.').ifEmpty { "16" }
+                    // 大字版本号：主版本 + 次版本（4.0.1.1001 → 4.0），与设计稿数字+点风格一致
+                    majorVersion = latestVersion.split('.')
+                        .take(2)
+                        .filter { it.isNotBlank() }
+                        .joinToString(".")
+                        .ifEmpty { "4.0" }
                 )
 
                 // ===== 文案与操作区 =====
@@ -1373,10 +1378,16 @@ private fun OceanHeader(
                     0f to Color(0xFF15161A).copy(alpha = 0f),
                     0.55f to Color(0xFF15161A).copy(alpha = 0.55f),
                     1f to Color(0xFF15161A),
-                    startY = 0.60f * h, endY = h
+                    startY = 0.55f * h, endY = h + 4f
                 ),
-                topLeft = Offset(0f, 0.60f * h),
-                size = Size(w, 0.40f * h)
+                topLeft = Offset(0f, 0.55f * h),
+                size = Size(w, 0.45f * h + 4f)
+            )
+            // 底部压边条：彻底消除波浪渐变叠层在交界处的残余亮边
+            drawRect(
+                color = Color(0xFF15161A),
+                topLeft = Offset(0f, h - 0.03f * h),
+                size = Size(w, 0.03f * h + 2f)
             )
 
             // ---- 5. 四颗气泡：上浮 + 呼吸淡入淡出 ----

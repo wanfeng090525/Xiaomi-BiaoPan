@@ -63,6 +63,8 @@ data class UiState(
     val showUpdateDialog: Boolean = false,
     /** 云配置检查进行中（检查更新可取消） */
     val isCheckingCloud: Boolean = false,
+    /** 当前手动检查类型："update" 检查更新 / "announce" 获取公告（决定加载弹窗文案） */
+    val checkingMode: String = "",
     // APK 下载
     val downloadProgress: Int = 0,
     val downloadTotalBytes: Long = 0L,
@@ -292,7 +294,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         cloudCheckJob = viewModelScope.launch {
             // 仅手动检查显示「检查中」弹窗；启动自动检查完全静默
             if (mode != "auto") {
-                _uiState.value = _uiState.value.copy(isCheckingCloud = true)
+                _uiState.value = _uiState.value.copy(isCheckingCloud = true, checkingMode = mode)
             }
             try {
                 val config = kotlinx.coroutines.withTimeoutOrNull(8_000L) {

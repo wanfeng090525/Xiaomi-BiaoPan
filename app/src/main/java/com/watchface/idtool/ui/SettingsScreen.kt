@@ -270,7 +270,9 @@ fun SettingsScreen(
                     GlowDot(color = IOSPalette.tint, dotSize = 10.dp)
                     Spacer(Modifier.height(14.dp))
                     Text(
-                        text = "正在检查更新…",
+                        // 按检查类型区分文案：查看公告时显示「正在获取公告…」
+                        text = if (state.checkingMode == "announce") "正在获取公告…"
+                        else "正在检查更新…",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
