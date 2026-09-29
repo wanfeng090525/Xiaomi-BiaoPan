@@ -1,6 +1,5 @@
 package com.watchface.idtool
 
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -98,25 +97,14 @@ object ApkDownloader {
     }
 
     /**
-     * URL 规范化：修复 HTML 实体 + 缺少协议头时自动补 https://
-     * （云端配置漏填协议时，应用内下载与浏览器打开统一走此兜底）
-     */
-    fun normalizeUrl(url: String): String {
-        val fixed = fixHtmlEntities(url.trim())
-        if (fixed.isEmpty()) return fixed
-        val hasScheme = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(fixed)
-        return if (hasScheme) fixed else "https://$fixed"
-    }
-
-    /**
      * 下载 APK 文件，带进度跟踪 / 取消 / 自动重试
      */
     suspend fun download(context: Context, urlStr: String) {
         cancelledFlag.set(false)
         _downloadState.value = DownloadState.Downloading(0, 0L, 0L)
 
-        // 入口即修复 HTML 实体 + 补全缺失的协议头（云端 upurl 漏填 https:// 时兜底）
-        val fixedUrl = normalizeUrl(urlStr)
+        // 入口即修复 HTML 实体（T3 后台/部分 CDN 返回的 upurl 常带 &amp;）
+        val fixedUrl = fixHtmlEntities(urlStr.trim())
 
         val outputFile = File(context.cacheDir, APK_FILE_NAME)
         val tmpFile = File(context.cacheDir, APK_FILE_NAME + TMP_SUFFIX)
@@ -310,30 +298,13 @@ object ApkDownloader {
      * 使用系统浏览器打开下载链接（兜底方案）
      */
     fun openInBrowser(context: Context, url: String) {
-        val fixed = normalizeUrl(url)
-        if (fixed.isEmpty()) return
         try {
+            val fixed = fixHtmlEntities(url.trim())
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(fixed)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-        } catch (e: ActivityNotFoundException) {
-            // 无默认浏览器处理该链接时，弹出选择器让用户挑选浏览器
-            try {
-                val chooser = Intent.createChooser(
-                    Intent(Intent.ACTION_VIEW, Uri.parse(fixed)),
-                    "选择浏览器下载"
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(chooser)
-            } catch (_: Throwable) {
-                // 完全无法跳转时给出提示，避免点击无响应
-                android.widget.Toast.makeText(
-                    context,
-                    "无法打开浏览器，请手动访问：$fixed",
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-            }
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
         }
     }
 

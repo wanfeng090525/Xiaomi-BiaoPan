@@ -440,16 +440,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun openDownloadInBrowser() {
         val url = _uiState.value.downloadUrl.ifEmpty {
-            _uiState.value.cloudConfig?.updateUrl ?: ""
-        }
-        if (url.isEmpty()) {
-            // 链接无效时给出提示，避免点击无响应
-            _uiState.value = _uiState.value.copy(
-                toastMessage = "下载链接无效，请稍后重试",
-                showDownloadProgress = false,
-                downloadError = null
-            )
-            return
+            _uiState.value.cloudConfig?.updateUrl ?: return
         }
         ApkDownloader.cancel() // 停止应用内下载
         ApkDownloader.openInBrowser(getApplication(), url)
