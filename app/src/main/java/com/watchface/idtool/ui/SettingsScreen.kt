@@ -45,7 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -279,7 +278,7 @@ fun SettingsScreen(
                         Icon(
                             painter = painterResource(id = com.watchface.idtool.R.drawable.ic_github),
                             contentDescription = "Github 仓库",
-                            tint = Color(0xFFF3F5FA),
+                            tint = Color.White,
                             modifier = Modifier.size(38.dp)
                         )
                         Spacer(Modifier.height(10.dp))
@@ -906,7 +905,7 @@ private fun LanguageDialog(
                                     Icon(
                                         Icons.Default.Check,
                                         contentDescription = null,
-                                        tint = Color(0xFFE9EBF4),
+                                        tint = Color.White,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -989,7 +988,7 @@ private fun BgStyleDialog(
                                 Icon(
                                     Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = Color(0xFFE9EBF4),
+                                    tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -1069,7 +1068,7 @@ private fun ColorPickerDialog(
                         text = "Aa 预览文字 Preview",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFFE9EBF4)
+                        color = Color.White
                     )
                 }
 

@@ -3,7 +3,6 @@ package com.watchface.idtool.ui
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.provider.OpenableColumns
 import android.provider.Settings
 import java.io.File
@@ -11,7 +10,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -639,22 +637,19 @@ private fun HitokotoBar() {
     val interaction = remember { MutableInteractionSource() }
     val timeColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.92f)
 
+    val hitokoShape = RoundedCornerShape(IOSPalette.cardRadius)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .liquidGlass(
-                RoundedCornerShape(20.dp),
-                blurRadius = 6.dp,
-                lensHeight = 12.dp,
-                lensAmount = 20.dp
+            .shadow(
+                elevation = 4.dp,
+                shape = hitokoShape,
+                clip = false,
+                spotColor = Color.Black.copy(alpha = 0.06f),
+                ambientColor = Color.Black.copy(alpha = 0.03f)
             )
-            .glass(
-                RoundedCornerShape(20.dp),
-                rememberGlassColors(
-                    tintTop = Color.White.copy(alpha = 0.08f),
-                    tintBottom = Color.White.copy(alpha = 0.03f)
-                )
-            )
+            .clip(hitokoShape)
+            .background(IOSPalette.card)
             .clickable(interactionSource = interaction, indication = null) {
                 refresh()
             }
@@ -997,23 +992,15 @@ private fun ImportedFileCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .liquidGlass(
-                        RoundedCornerShape(15.dp),
-                        blurRadius = 4.dp,
-                        lensHeight = 8.dp,
-                        lensAmount = 12.dp
-                    )
-                    .glass(
-                        RoundedCornerShape(15.dp),
-                        rememberGlassColors()
-                    ),
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(IOSPalette.tileRadius))
+                    .background(IOSPalette.tileBlue),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Watch,
                     contentDescription = null,
-                    tint = Color(0xFFE9EBF4),
+                    tint = Color.White,
                     modifier = Modifier.size(21.dp)
                 )
             }
@@ -1148,7 +1135,7 @@ internal fun AnnouncementDialog(
                     Box(
                         modifier = Modifier
                             .size(58.dp)
-                            .glow(Color(0xFFE9EBF4).copy(alpha = 0.30f), radiusFraction = 1.6f)
+                            .glow(IOSPalette.tint.copy(alpha = 0.22f), radiusFraction = 1.4f)
                             .glass(CircleShape, rememberGlassColors()),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1205,7 +1192,7 @@ internal fun UpdateDialog(
                     Box(
                         modifier = Modifier
                             .size(58.dp)
-                            .glow(Color(0xFFD9DEEB).copy(alpha = 0.30f), radiusFraction = 1.6f)
+                            .glow(IOSPalette.tileTeal.copy(alpha = 0.22f), radiusFraction = 1.4f)
                             .glass(CircleShape, rememberGlassColors()),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1542,7 +1529,7 @@ private fun KeyExtractionTile(
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = null,
-                        tint = Color(0xFFE9EBF4),
+                        tint = Color.White,
                         modifier = Modifier
                             .size(18.dp)
                             .graphicsLayer { rotationZ = rotation }
@@ -1551,7 +1538,7 @@ private fun KeyExtractionTile(
                     Icon(
                         Icons.Default.Shield,
                         contentDescription = null,
-                        tint = Color(0xFFE9EBF4),
+                        tint = Color.White,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1657,7 +1644,7 @@ private fun KeyExtractionResultCard(
                     Icon(
                         Icons.Default.Shield,
                         contentDescription = null,
-                        tint = Color(0xFFE9EBF4),
+                        tint = IOSPalette.secondaryLabel,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1763,7 +1750,7 @@ private fun KeyExtractionResultCard(
                         Box(
                             modifier = Modifier
                                 .size(6.dp)
-                                .background(Color(0xFFE9EBF4), CircleShape)
+                                .background(IOSPalette.success, CircleShape)
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(

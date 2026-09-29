@@ -34,7 +34,6 @@ data class BgConfig(
  * · densityFactor      显示密度缩放（DPI），拉条 80% ~ 110% 连续调节
  * · bgMode/bgColor     背景样式（默认壁纸 / 相册图片·含动图 / 纯色 / 液态动态）
  * · announceAutoShow   启动时自动弹出新公告（开关，默认开）
- * · snowEnabled        雪花飘落特效（开关，默认开）
  */
 object AppSettings {
     private const val PREFS = "app_settings"
@@ -44,7 +43,6 @@ object AppSettings {
     private const val KEY_BG_MODE = "bg_mode"
     private const val KEY_BG_COLOR = "bg_color"
     private const val KEY_ANNOUNCE_AUTO = "announce_auto_show"
-    private const val KEY_SNOW = "snow_enabled"
 
     /** 密度拉条范围：80% ~ 110% */
     const val DENSITY_MIN = 0.8f
@@ -62,10 +60,6 @@ object AppSettings {
     val announceAutoShowState = mutableStateOf(true)
     val announceAutoShow: Boolean get() = announceAutoShowState.value
 
-    /** 雪花飘落特效（响应式开关） */
-    val snowEnabledState = mutableStateOf(true)
-    val snowEnabled: Boolean get() = snowEnabledState.value
-
     fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -78,7 +72,6 @@ object AppSettings {
             color = p.getLong(KEY_BG_COLOR, 0xFF14151F)
         )
         announceAutoShowState.value = p.getBoolean(KEY_ANNOUNCE_AUTO, true)
-        snowEnabledState.value = p.getBoolean(KEY_SNOW, true)
         com.watchface.idtool.ui.AppLocale.apply(p.getString(KEY_LANG, "zh") ?: "zh")
     }
 
@@ -103,12 +96,6 @@ object AppSettings {
     fun setAnnounceAutoShow(context: Context, enabled: Boolean) {
         announceAutoShowState.value = enabled
         prefs(context).edit().putBoolean(KEY_ANNOUNCE_AUTO, enabled).apply()
-    }
-
-    // ---------- 雪花特效开关 ----------
-    fun setSnowEnabled(context: Context, enabled: Boolean) {
-        snowEnabledState.value = enabled
-        prefs(context).edit().putBoolean(KEY_SNOW, enabled).apply()
     }
 
     // ---------- 背景 ----------
