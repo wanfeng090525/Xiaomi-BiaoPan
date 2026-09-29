@@ -43,10 +43,13 @@ jobs:
       - name: 缓存 Gradle（依赖 + 构建缓存）
         uses: gradle/actions/setup-gradle@v4
 
-      - name: 生成本地配置并接受 SDK 许可
+      - name: 生成本地配置并预置 SDK 许可
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          # 直接写入许可哈希文件，比 sdkmanager --licenses 快十几秒
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "8933bad161af4178b1185d1a37fbf41ea5269c55\n24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c7c9a3522867b\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
 
       # 组装 Gradle 任务与参数：
       # - Debug 包：默认不构建，输入选"开启"才追加 assembleDebug
