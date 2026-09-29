@@ -52,7 +52,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,39 +87,19 @@ fun HistoryScreen(
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // ============ 标题栏 ============
-            item {
-                StaggeredItem(index = 0) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconBadge(
-                            icon = Icons.Default.History,
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "修改记录",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = if (records.isEmpty()) "暂无记录"
-                                else AppLocale.tf("共 {0} 条记录", records.size),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        if (records.isNotEmpty()) {
-                            // 导出文本
+            // ============ 操作按钮行（无标题，右对齐）============
+            if (records.isNotEmpty()) {
+                item {
+                    StaggeredItem(index = 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End
+                        ) {
                             GlassIconButton(
                                 icon = Icons.Default.IosShare,
                                 contentDescription = "导出记录",
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = IOSPalette.tint,
                                 size = 34.dp,
                                 onClick = {
                                     val text = RecordStore.exportText(context)
@@ -135,17 +114,12 @@ fun HistoryScreen(
                                 }
                             )
                             Spacer(Modifier.width(8.dp))
-                            // 清空
                             GlassIconButton(
                                 icon = Icons.Default.DeleteSweep,
                                 contentDescription = "清空记录",
-                                tint = AppColors.dangerAdaptive(),
+                                tint = IOSPalette.destructive,
                                 size = 34.dp,
-                                tintTop = AppColors.danger.copy(alpha = 0.12f),
-                                tintBottom = AppColors.danger.copy(alpha = 0.06f),
-                                onClick = {
-                                    showClearAllDialog = true
-                                }
+                                onClick = { showClearAllDialog = true }
                             )
                         }
                     }
@@ -361,7 +335,7 @@ private fun HistoryRecordCard(
                     Icon(
                         Icons.Default.Description,
                         contentDescription = null,
-                        tint = Color(0xFFE9EBF4),
+                        tint = IOSPalette.secondaryLabel,
                         modifier = Modifier.size(12.dp)
                     )
                     Spacer(Modifier.width(6.dp))
@@ -424,7 +398,7 @@ private fun HistoryRecordCard(
                 Icon(
                     Icons.Default.Watch,
                     contentDescription = null,
-                    tint = Color(0xFFE9EBF4),
+                    tint = IOSPalette.tileBlue,
                     modifier = Modifier.size(11.dp)
                 )
             }
@@ -467,7 +441,7 @@ private fun PulsingArrow() {
     Icon(
         Icons.AutoMirrored.Filled.ArrowForward,
         contentDescription = null,
-        tint = Color(0xFFE9EBF4).copy(alpha = 0.35f + 0.65f * t),
+        tint = IOSPalette.tint.copy(alpha = 0.35f + 0.65f * t),
         modifier = Modifier
             .size(18.dp)
             .graphicsLayer { translationX = 4f * sin(t * Math.PI.toFloat() * 2f) }
@@ -509,25 +483,19 @@ private fun EmptyHistoryState() {
                 modifier = Modifier
                     .size(64.dp)
                     .alpha(0.25f + 0.2f * t)
-                    .glass(CircleShape, rememberGlassColors())
+                    .background(IOSPalette.tileBlue.copy(alpha = 0.10f), CircleShape)
             )
             // 内圈玻璃
             Box(
                 modifier = Modifier
                     .size(46.dp)
-                    .liquidGlass(
-                        CircleShape,
-                        blurRadius = 4.dp,
-                        lensHeight = 6.dp,
-                        lensAmount = 10.dp
-                    )
-                    .glass(CircleShape, rememberGlassColors()),
+                    .background(IOSPalette.card, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.History,
                     contentDescription = null,
-                    tint = Color(0xFFE9EBF4),
+                    tint = IOSPalette.secondaryLabel,
                     modifier = Modifier.size(22.dp)
                 )
             }

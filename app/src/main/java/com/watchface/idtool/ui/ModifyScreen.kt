@@ -66,14 +66,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -84,6 +82,10 @@ import com.watchface.idtool.MainViewModel
 import com.watchface.idtool.RecordStore
 import com.watchface.idtool.UiState
 import com.watchface.idtool.WatchfaceParser
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * 修改页：液态玻璃重构版
@@ -132,31 +134,7 @@ fun ModifyScreen(
     ) {
         Spacer(Modifier.height(16.dp))
 
-        // ============ 标题 ============
-        StaggeredItem(index = 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconBadge(icon = Icons.Default.Tag, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "修改表盘",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "修改 ID 与名称，导出到 Download",  // 走 Text 包装器翻译
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
 
         // ============ 文件选择区 ============
         StaggeredItem(index = 1) {
@@ -408,59 +386,51 @@ private fun FileDropCard(
 ) {
     val interaction = remember { MutableInteractionSource() }
 
-    val success = AppColors.successAdaptive()
+    // iOS 上传卡：白底 + 1px 虚线系统蓝描边（已选文件转绿）
     val borderSpec by animateColorAsState(
-        targetValue = if (hasFile) success else MaterialTheme.colorScheme.primary,
+        targetValue = if (hasFile) IOSPalette.success else IOSPalette.tint,
         animationSpec = tween(400),
         label = "dropBorder"
     )
-    val colors = rememberGlassColors(
-        tintTop = if (hasFile) success.copy(alpha = 0.16f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-        tintBottom = if (hasFile) success.copy(alpha = 0.06f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
-    )
-    val shape = RoundedCornerShape(22.dp)
-    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val shape = RoundedCornerShape(IOSPalette.cardRadius)
     val dropPressed by interaction.collectIsPressedAsState()
-    val dropPressScale by animateFloatAsState(
-        targetValue = if (dropPressed) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
-        label = "dropPressScale"
+    val dropPressAlpha by animateFloatAsState(
+        targetValue = if (dropPressed) IOSPalette.pressedOpacity else 1f,
+        animationSpec = tween(90),
+        label = "dropPressAlpha"
     )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .glassShadow(8.dp, shape)
-            .liquidGlass(
+            .shadow(
+                elevation = 3.dp,
                 shape = shape,
-                blurRadius = 6.dp,
-                lensHeight = 12.dp,
-                lensAmount = 20.dp,
-                layerBlock = {
-                    scaleX = dropPressScale
-                    scaleY = dropPressScale
-                }
+                clip = false,
+                spotColor = Color.Black.copy(alpha = 0.05f),
+                ambientColor = Color.Black.copy(alpha = 0.02f)
             )
-            .glass(shape, colors)
+            .graphicsLayer { alpha = dropPressAlpha }
+            .clip(shape)
+            .background(IOSPalette.card)
             .drawBehind {
-                // 呼吸描边：加载后为绿色，未加载为蓝色
+                // 1px 虚线描边（iOS dashed border）：未选蓝、已选绿
                 val outline = shape.createOutline(size, layoutDirection, this)
                 drawOutline(
                     outline = outline,
-                    brush = Brush.linearGradient(
-                        listOf(
-                            borderSpec.copy(alpha = 0.75f),
-                            borderSpec.copy(alpha = 0.25f)
+                    color = borderSpec.copy(alpha = 0.9f),
+                    style = Stroke(
+                        width = 1.4.dp.toPx(),
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                            floatArrayOf(10f, 8f)
                         )
-                    ),
-                    style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
+                    )
                 )
             }
-            .pressRipple(interaction, clipShape = shape, color = if (hasFile) Color(0xFFE9EBF4) else Color(0xFFD9DEEB), intensity = 1.15f)
             .clickable(interactionSource = interaction, indication = null) {
                 onClick()
             }
-            .padding(vertical = 22.dp, horizontal = 16.dp),
+            .padding(vertical = 26.dp, horizontal = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -469,21 +439,17 @@ private fun FileDropCard(
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .glow(borderSpec.copy(alpha = 0.30f), radiusFraction = 1.5f)
-                        .liquidGlass(
-                            CircleShape,
-                            blurRadius = 4.dp,
-                            lensHeight = 6.dp,
-                            lensAmount = 10.dp
-                        )
-                        .glass(CircleShape, rememberGlassColors()),
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (hasFile) IOSPalette.success.copy(alpha = 0.12f)
+                            else IOSPalette.tint.copy(alpha = 0.10f)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.FolderOpen,
                         contentDescription = "选择文件",
-                        // 跟随主题，避免深浅色/缩放后发灰发虚
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        tint = if (hasFile) IOSPalette.success else IOSPalette.tint,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -499,22 +465,16 @@ private fun FileDropCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(19.dp)
-                            .glow(Color.White.copy(alpha = 0.30f), radiusFraction = 1.5f)
-                            .glass(
-                                CircleShape,
-                                rememberGlassColors(
-                                    tintTop = Color.White.copy(alpha = 0.30f),
-                                    tintBottom = Color.White.copy(alpha = 0.14f)
-                                )
-                            ),
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(IOSPalette.success),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Check,
                             contentDescription = null,
-                            tint = Color(0xFFF3F5FA),
-                            modifier = Modifier.size(12.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                 }
@@ -534,30 +494,30 @@ private fun FileDropCard(
                     if (loaded) {
                         Text(
                             text = name,
-                            fontSize = 14.sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = success,
+                            color = IOSPalette.label,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(
                             text = "已加载 · 点击重新选择",
-                            fontSize = 11.5.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = 13.sp,
+                            color = IOSPalette.secondaryLabel
                         )
                     } else {
                         Text(
                             text = "点击选择表盘文件",
-                            fontSize = 14.sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = IOSPalette.label
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(
                             text = "支持 .bin 表盘文件",
-                            fontSize = 11.5.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = 13.sp,
+                            color = IOSPalette.secondaryLabel
                         )
                     }
                 }
@@ -793,7 +753,7 @@ private fun IdValidationHint(id: String, valid: Boolean) {
                         Icons.Default.Check,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = Color(0xFFE9EBF4)
+                        tint = IOSPalette.success
                     )
                     Spacer(Modifier.width(5.dp))
                     Text(
@@ -808,7 +768,7 @@ private fun IdValidationHint(id: String, valid: Boolean) {
                         Icons.Default.ErrorOutline,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = Color(0xFFE9EBF4)
+                        tint = IOSPalette.destructive
                     )
                     Spacer(Modifier.width(5.dp))
                     val error = WatchfaceParser.validateId(id)
@@ -864,7 +824,7 @@ internal fun IconBadge(
         Icon(
             icon,
             contentDescription = null,
-            tint = Color(0xFFE9EBF4),
+            tint = IOSPalette.secondaryLabel,
             modifier = Modifier.size(iconSize)
         )
     }

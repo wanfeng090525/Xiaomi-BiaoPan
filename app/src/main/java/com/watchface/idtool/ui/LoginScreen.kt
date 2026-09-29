@@ -122,10 +122,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             placeholder = { Text("请输入卡密") },
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFFE9EBF4).copy(alpha = 0.6f),
+                focusedBorderColor = IOSPalette.tint,
                 unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                focusedLabelColor = Color(0xFFE9EBF4),
-                cursorColor = Color(0xFFE9EBF4),
+                focusedLabelColor = IOSPalette.tint,
+                cursorColor = IOSPalette.tint,
                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
