@@ -1986,10 +1986,10 @@ fun GlassNavBar(
                         animationSpec = tween(90),
                         label = "tabPress$index"
                     )
-                    // 选中 #007AFF，未选中 #8E8E93
+                    // 选中 #007AFF，未选中黑色（目标效果图：未选中纯黑，选中变蓝）
                     val glyph by animateColorAsState(
                         targetValue = if (isSelected) IOSPalette.tint
-                        else IOSPalette.secondaryLabel,
+                        else IOSPalette.label,
                         animationSpec = tween(180),
                         label = "tabColor$index"
                     )

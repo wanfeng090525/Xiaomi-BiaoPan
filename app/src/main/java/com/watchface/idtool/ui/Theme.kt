@@ -60,8 +60,8 @@ object IOSPalette {
     /** TabBar 胶囊底 */
     val tabBar = Color(0xFFFFFFFF)
 
-    /** TabBar 选中胶囊底（浅蓝） */
-    val capsuleSelected = Color(0xFFE5F0FF)
+    /** TabBar 选中胶囊底（中性半透明灰，iOS quaternary fill 风格的透明光效） */
+    val capsuleSelected = Color(0x1F767680)
 
     // ---- 分割线 ----
     /** 项间 1px 分割线 */
