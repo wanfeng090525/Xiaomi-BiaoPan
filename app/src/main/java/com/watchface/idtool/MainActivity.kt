@@ -311,7 +311,9 @@ private fun AppContent() {
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    // 比例参考头条 dock：左右各 48dp → 居中占 ~74% 屏宽
+                    // 底部 28dp → 浮岛与系统导航条之间的视觉距离
+                    .padding(start = 48.dp, end = 48.dp, bottom = 28.dp)
             )
 
             if (isRestoring || state.isLoading) {

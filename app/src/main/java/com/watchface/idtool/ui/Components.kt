@@ -2000,9 +2000,10 @@ fun GlassNavBar(
 
     val brandGreen = Color(0xFF34C759)
     val idleInk = Color(0xFF16181C)
-    val chipSize = 52.dp
-    val dockShape = RoundedCornerShape(32.dp)
-    val chipShape = RoundedCornerShape(22.dp)
+    // 比例参考酷安头条 App：容器宽 ~74% 屏宽（不撑满）、圆角 38dp、内容高 56dp
+    val chipSize = 56.dp
+    val dockShape = RoundedCornerShape(38.dp)
+    val chipShape = RoundedCornerShape(24.dp)
 
     // 各 Tab 位置（onGloballyPositioned 采集；坐标基于内容区，指示块同处内容区故直接对齐）
     var tabMetrics by remember { mutableStateOf(List<TabMetrics?>(tabs.size) { null }) }
@@ -2094,18 +2095,18 @@ fun GlassNavBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            // 防御性最大高度：正常渲染下实际高度 = chipSize + 14dp ≈ 66dp，
+            // 防御性最大高度：正常渲染下实际高度 = chipSize + 16dp ≈ 72dp（头条 dock 比例），
             // 此限制只在 backdrop 异常回流时兜底，避免撑大屏幕
-            .heightIn(max = 76.dp)
+            .heightIn(max = 84.dp)
             // 整个 Dock 浮岛跟手平移：拖动起点 tab 中心 → 当前手指位置，
             // 视觉上像把整列物理浮岛拉过去；松手后 spring 回弹 + 切页
             .graphicsLayer { translationX = dockOffsetX }
             .shadow(
-                elevation = 8.dp,
+                elevation = 10.dp,
                 shape = dockShape,
                 clip = false,
-                spotColor = Color.Black.copy(alpha = 0.30f),
-                ambientColor = Color.Black.copy(alpha = 0.14f)
+                spotColor = Color.Black.copy(alpha = 0.32f),
+                ambientColor = Color.Black.copy(alpha = 0.16f)
             )
             // 完全透明的液体玻璃：只做真实背景模糊 + 折射，不画任何固定底色。
             // 颜色完全由 AppBackground 经 backdrop 透出——
@@ -2113,27 +2114,27 @@ fun GlassNavBar(
             // 这就是酷安头条 App 那种"dock 颜色随背景变"的细节。
             .liquidGlass(
                 shape = dockShape,
-                blurRadius = 24.dp,
-                lensHeight = 10.dp,
-                lensAmount = 14.dp
+                blurRadius = 28.dp,
+                lensHeight = 12.dp,
+                lensAmount = 16.dp
             )
-            // 1.2dp 亮边：透明 Dock 在任何背景下都需要一条清晰轮廓
+            // 1.5dp 亮边：透明 Dock 在任何背景下都需要一条清晰轮廓
             .drawBehind {
                 val outline = dockShape.createOutline(size, layoutDirection, this)
                 drawOutline(
                     outline = outline,
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.55f),
+                            Color.White.copy(alpha = 0.60f),
                             Color.White.copy(alpha = 0.10f)
                         ),
                         start = Offset(0f, 0f),
                         end = Offset(size.width, size.height)
                     ),
-                    style = Stroke(width = 1.2.dp.toPx())
+                    style = Stroke(width = 1.5.dp.toPx())
                 )
             }
-            .padding(horizontal = 6.dp, vertical = 7.dp)
+            .padding(horizontal = 6.dp, vertical = 8.dp)
     ) {
         // 选中态：圆角矩形浅色块，垫底绘制（颜色是白底上的低透明黑 = 均匀浅灰）
         if (activeIndex in tabs.indices) {
