@@ -1800,23 +1800,23 @@ fun GlassChip(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(50)
-    // 单色系规格：选中态为高亮白玻璃，不使用主题色
-    val active = Color.White
+    // iOS 规格：选中 = 浅蓝底 + 蓝字（同 Dock 选中态），未选中 = 浅灰底 + 黑字
+    val active = IOSPalette.tint
 
     val borderColor by animateColorAsState(
-        targetValue = if (selected) active else Color.White.copy(alpha = 0.14f),
+        targetValue = if (selected) active else IOSPalette.separator,
         animationSpec = tween(240),
         label = "chipBorder"
     )
     val fillTop by animateColorAsState(
-        targetValue = if (selected) active.copy(alpha = 0.30f)
-        else Color.White.copy(alpha = 0.10f),
+        targetValue = if (selected) active.copy(alpha = 0.16f)
+        else IOSPalette.label.copy(alpha = 0.05f),
         animationSpec = tween(240),
         label = "chipTop"
     )
     val fillBottom by animateColorAsState(
-        targetValue = if (selected) active.copy(alpha = 0.14f)
-        else Color.White.copy(alpha = 0.04f),
+        targetValue = if (selected) active.copy(alpha = 0.10f)
+        else IOSPalette.label.copy(alpha = 0.025f),
         animationSpec = tween(240),
         label = "chipBottom"
     )
@@ -1885,7 +1885,7 @@ fun GlassChip(
             .pressRipple(
                 interaction,
                 clipShape = shape,
-                color = if (selected) active else Color.White,
+                color = Color.Black.copy(alpha = 0.06f),
                 intensity = 1.05f
             )
             .clickable(interactionSource = interaction, indication = null) {
@@ -1899,8 +1899,8 @@ fun GlassChip(
             fontSize = 12.5.sp,
             fontWeight = FontWeight.Medium,
             letterSpacing = 0.3.sp,
-            color = if (selected) Color.White
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected) active
+            else MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1
         )

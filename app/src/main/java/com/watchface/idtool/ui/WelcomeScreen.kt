@@ -1428,8 +1428,9 @@ private fun KeyExtractionTile(
             .fillMaxWidth()
             .glassShadow(8.dp, RoundedCornerShape(22.dp))
             .pressScale(interaction, pressedScale = 0.96f)
-            .glass(RoundedCornerShape(22.dp), rememberGlassColors())
-            .pressRipple(interaction, clipShape = RoundedCornerShape(22.dp), color = Color.White, intensity = 1f)
+            .clip(RoundedCornerShape(22.dp))
+            .background(IOSPalette.card)
+            .pressRipple(interaction, clipShape = RoundedCornerShape(22.dp), color = Color.Black.copy(alpha = 0.06f), intensity = 1f)
             .clickable(
                 interactionSource = interaction,
                 indication = null
@@ -1451,10 +1452,8 @@ private fun KeyExtractionTile(
             Box(
                 modifier = Modifier
                     .size(38.dp)
-                    .glass(
-                        RoundedCornerShape(13.dp),
-                        rememberGlassColors()
-                    ),
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(IOSPalette.tint.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (isExtracting) {
@@ -1568,7 +1567,8 @@ private fun KeyExtractionResultCard(
         modifier = Modifier
             .fillMaxWidth()
             .glassShadow(8.dp, RoundedCornerShape(22.dp))
-            .glass(RoundedCornerShape(22.dp), rememberGlassColors())
+            .clip(RoundedCornerShape(22.dp))
+            .background(IOSPalette.card)
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

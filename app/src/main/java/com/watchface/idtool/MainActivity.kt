@@ -293,9 +293,9 @@ private fun AppContent() {
                     "home" -> 0
                     "modify" -> 1
                     "history" -> 2
-                    // 设置页由右侧圆形按钮承载：保持高亮「主页」作为来源，
-                    // 避免出现"点进设置后 Dock 无任何选中态"的空档
-                    else -> 0
+                    // 设置页由右侧圆形按钮承载：越界索引让指示胶囊平滑淡出，
+                    // 不再错误地停在「主页」上
+                    else -> 3
                 },
                 onSelect = { index ->
                     switchPage(

@@ -64,10 +64,13 @@ object HitokotoApi {
             if (conn.responseCode != 200) return fallback()
             val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             val json = JSONObject(body)
-            val text = unescape(json.optString("hitokoto", "") ?: "").trim()
+            // org.json 的 optString 在字段为 JSON null 时返回字符串 "null"，需还原为空
+            fun opt(key: String): String =
+                unescape(json.optString(key, "") ?: "").trim().takeIf { it != "null" } ?: ""
+            val text = opt("hitokoto")
             if (text.isEmpty()) return fallback()
-            val fromRaw = unescape(json.optString("from", "") ?: "").trim()
-            val who = unescape(json.optString("from_who", "") ?: "").trim()
+            val fromRaw = opt("from")
+            val who = opt("from_who")
             val from = buildString {
                 if (fromRaw.isNotBlank()) {
                     append("《")
