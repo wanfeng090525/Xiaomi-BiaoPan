@@ -1196,7 +1196,7 @@ internal fun UpdateDialog(
                             append(AppLocale.tf("XiaomBP {0} 带来更稳定、更流畅的使用体验。", latestVersion))
                         }
                         pushStringAnnotation(tag = "URL", annotation = releaseUrl)
-                        withStyle(linkStyle) { append(" 查看详情") }
+                        withStyle(linkStyle) { append(AppLocale.t(" 查看详情")) }
                         pop()
                     }
                     ClickableText(
