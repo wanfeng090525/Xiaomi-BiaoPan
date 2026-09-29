@@ -1,22 +1,39 @@
 package com.watchface.idtool.ui
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Movie
+import android.graphics.drawable.Drawable
+import android.graphics.ImageDecoder
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.Build
 import android.view.MotionEvent
+import android.widget.ImageView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
@@ -24,17 +41,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,30 +69,42 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -85,21 +118,31 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.highlight.HighlightStyle
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
+import com.kyant.shapes.Capsule
 import com.watchface.idtool.AppSettings
 import com.watchface.idtool.BgMode
+import java.io.File
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
@@ -157,6 +200,148 @@ object AppColors {
 //   · 深色基底上关闭库自带 Shadow（不可见且增加 GPU 负担）
 //   · 按压缩放走 layerBlock（背景折射不跟手缩放，官方 Interactive 教程规格）
 //   · API < 31 无 RenderEffect、< 33 无 RuntimeShader 时库内部自动降级
+// ====================================================================
+
+/** 全局液态玻璃背景层：由根布局的 AppBackground 注册，玻璃组件据此折射采样 */
+val LocalAppBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
+
+/**
+ * 液态玻璃倾斜高光：全局唯一加速计监听。
+ *
+ * 单例注册（而非每个玻璃组件各注册一个 listener），所有 liquidGlass 组件共享
+ * 同一角度状态，镜面高光方向随手机倾斜实时移动 —— iOS 液态玻璃的标志性反光。
+ * 无加速计 / 传感器不可用时角度保持默认 45°（左上受光），功能自动降级。
+ */
+object LiquidGlassTilt {
+
+    /** 高光角度（度）：atan2(y, x)，0° = 右侧受光，45° = 左上受光 */
+    val angle = mutableFloatStateOf(45f)
+
+    private var manager: SensorManager? = null
+    private var listener: SensorEventListener? = null
+
+    fun start(context: Context) {
+        if (listener != null) return
+        // 无 RuntimeShader 的机型高光完全由 painted 规格绘制，倾斜角度不参与渲染，
+        // 不注册加速计（避免无谓耗电）
+        if (!LiquidGlassShaderSupported) return
+        val m = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+        val accelerometer = m.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+        val l = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event == null || event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
+                val target = atan2(event.values[1], event.values[0]) * (180f / PI.toFloat())
+                // 低通滤波：抑制手持抖动，保持高光平滑
+                val alpha = 0.15f
+                angle.value = angle.value * (1f - alpha) + target * alpha
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+        m.registerListener(l, accelerometer, SensorManager.SENSOR_DELAY_UI)
+        manager = m
+        listener = l
+    }
+
+    fun stop() {
+        listener?.let { manager?.unregisterListener(it) }
+        listener = null
+        manager = null
+    }
+}
+
+/** 折射统一增益：历史逐点折射参数偏保守，放大后由形状尺寸上限兜底 */
+private const val LIQUID_LENS_GAIN = 1.4f
+
+/**
+ * 库的镜面高光 / 边缘折射（lens）依赖 API 33+ 的 RuntimeShader：
+ *   · API ≥ 33  真实折射 + 随倾斜实时转动的方向性镜面高光
+ *   · API 31-32 仅有 blur / vibrancy；折射 no-op，高光退化为一圈均匀 0.5dp 白描边
+ *   · API < 31  全部 no-op
+ * 低版本没有可用的折射高光，玻璃质感必须由 [glass] 的 painted 规格
+ * （菲涅尔顶缘亮线 + 非对称折射描边）承担，否则界面会退化成纯色色块。
+ */
+private val LiquidGlassShaderSupported: Boolean
+    get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+/**
+ * 真实液态玻璃材质（官方 get-started / ControlCenter 规格深度优化）：
+ *   1. vibrancy  背景色彩提亮（iOS 同款）
+ *   2. blur      磨砂模糊
+ *   3. lens      边缘折射：历史参数按官方比例放大，并夹在形状圆角半径内
+ *                （胶囊 / 圆形的圆角半径 = minDimension/2，故上限取 minDimension/2），
+ *                同时开启 depthEffect（厚度折射）+ chromaticAberration（边缘色散）
+ *
+ * 镜面高光由库 RuntimeShader 绘制，角度取自 [LiquidGlassTilt]（随倾斜实时变化）；
+ * 自绘描边在检出真实折射层时自动让位（见 [glass]），避免边缘双层高光发白。
+ *
+ * [layerBlock] 按压缩放等图形变换：变换只作用于「玻璃面板 + 内容」，
+ * 背景折射保持原位（官方 Interactive 教程明确：graphicsLayer 缩放会让背景跟随缩放）。
+ * 无背景层（LocalAppBackdrop 为 null）时安全降级为 painted 玻璃。
+ */
+@Composable
+fun Modifier.liquidGlass(
+    shape: Shape,
+    blurRadius: Dp = 12.dp,
+    lensHeight: Dp = 18.dp,
+    lensAmount: Dp = 30.dp,
+    depthEffect: Boolean = true,
+    chromaticAberration: Boolean = true,
+    layerBlock: (GraphicsLayerScope.() -> Unit)? = null
+): Modifier {
+    val backdrop = LocalAppBackdrop.current ?: return this
+    return this.drawBackdrop(
+        backdrop = backdrop,
+        shape = { shape },
+        effects = {
+            val minDimension = size.minDimension
+            vibrancy()
+            // 磨砂：略加强并限制上限，保持通透
+            blur((blurRadius.toPx() * 1.25f).coerceAtMost(minDimension * 0.6f))
+            // 折射：放大到官方的强折射区间，上限 = 形状圆角半径（minDimension/2）
+            lens(
+                refractionHeight = (lensHeight.toPx() * LIQUID_LENS_GAIN)
+                    .coerceAtMost(minDimension * 0.5f),
+                refractionAmount = (lensAmount.toPx() * LIQUID_LENS_GAIN)
+                    .coerceAtMost(minDimension),
+                depthEffect = depthEffect,
+                chromaticAberration = chromaticAberration
+            )
+        },
+        // 镜面高光：角度随重力倾斜实时转动（绘制期读取状态 → 自动失效重绘）。
+        // 无 RuntimeShader 的机型上库画不出方向性高光，只会沿轮廓描一圈均匀白边，
+        // 与 painted 顶缘亮线叠成双层描边，故直接关闭交由 [glass] 承担。
+        highlight = if (LiquidGlassShaderSupported) {
+            {
+                Highlight(
+                    alpha = 1f,
+                    style = HighlightStyle.Default(angle = LiquidGlassTilt.angle.value, falloff = 2f)
+                )
+            }
+        } else null,
+        // 深色基底上投影不可见且拖慢 GPU：关闭库自带 Shadow
+        shadow = null,
+        layerBlock = layerBlock
+    )
+}
+
+/**
+ * 液态玻璃选中面板（LiquidBottomTabs 参考组件规格）：
+ * 组合折射源（全局背景 + Dock 自身内容），按压时折射加深 + 色散 + 内阴影，
+ * 玻璃面板随按压弹簧放大（背景不跟随缩放）。
+ *
+ * [pressProgress] 0f..1f 按压进度（弹簧驱动）。
+ */
+@Composable
+fun Modifier.liquidGlassPanel(
+    backdrop: Backdrop,
+    shape: Shape,
+    pressProgress: () -> Float,
+    lensHeight: Dp = 10.dp,
+    lensAmount: Dp = 14.dp
+): Modifier = this.drawBackdrop(
+    backdrop = backdrop,
+    shape = { shape },
     effects = {
         // 按压越深折射越强 + 开启色散（LiquidBottomTabs: lens(10p, 14p, chromaticAberration)）
         val p = pressProgress()
@@ -329,6 +514,184 @@ fun Modifier.glassShadow(
 // 液态玻璃拉条（GlassSlider · iOS 液态风格）
 //   · 玻璃渐变轨道 + 高光填充 + 圆形发光玻璃滑块
 //   · 拖动跟手、松手弹簧归位
+// ====================================================================
+
+@Composable
+fun GlassSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int = 0,
+    onValueChangeFinished: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val min = valueRange.start
+    val max = valueRange.endInclusive
+    val span = (max - min).coerceAtLeast(1e-4f)
+    val intervals = steps + 1
+    val fraction = ((value - min) / span).coerceIn(0f, 1f)
+
+    var dragging by remember { mutableStateOf(false) }
+    // 位置由 value 直接驱动，不再经过 Animatable 弹簧（此前松手弹簧归位会让
+    // 滑块与手指不同步、拖不动；现在跟手零延迟）。仅保留按压放大的手感反馈。
+    val thumbScale by animateFloatAsState(
+        targetValue = if (dragging) 1.2f else 1f,
+        animationSpec = tween(110),
+        label = "sliderThumbScale"
+    )
+
+    fun valueFromFraction(f: Float): Float {
+        val clamped = f.coerceIn(0f, 1f)
+        return if (steps > 0) {
+            val k = (clamped * intervals).roundToInt().coerceIn(0, intervals)
+            min + (k.toFloat() / intervals) * span
+        } else {
+            min + clamped * span
+        }
+    }
+
+    BoxWithConstraints(modifier = modifier.height(32.dp)) {
+        // 统一换算到像素，避免 Dp/Px 混算与 BoxScope.align 类型歧义
+        val trackH = with(density) { 6.dp.toPx() }
+        val thumbPx = with(density) { 24.dp.toPx() }
+        val barH = with(density) { 32.dp.toPx() }
+        val trackW = with(density) { maxWidth.toPx() }
+        // 垂直居中：滑块 24dp 与轨道 6dp 对齐到同一条中心线
+        val thumbTop = (barH - thumbPx) / 2f
+        val trackTop = thumbTop + (thumbPx - trackH) / 2f
+        // 滑块位置由 value 计算得出（去掉 spring 后纯跟手，无延迟）
+        val thumbX = fraction * (trackW - thumbPx)
+        val thumbCenter = thumbX + thumbPx / 2f
+
+        // 未激活轨道（凹槽底）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .offset { IntOffset(0, trackTop.roundToInt()) }
+                .drawBehind {
+                    drawRoundRect(
+                        color = IOSPalette.separator,
+                        topLeft = Offset.Zero,
+                        size = Size(size.width, trackH),
+                        cornerRadius = CornerRadius(trackH / 2f, trackH / 2f)
+                    )
+                }
+        )
+
+        // 已激活填充（左至滑块中心的白色液态渐变 + 微光）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .offset { IntOffset(0, trackTop.roundToInt()) }
+                .drawBehind {
+                    val w = thumbCenter.coerceIn(0f, size.width)
+                    drawRoundRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                IOSPalette.tint,
+                                IOSPalette.tint
+                            )
+                        ),
+                        topLeft = Offset.Zero,
+                        size = Size(w, size.height),
+                        cornerRadius = CornerRadius(size.height / 2f, size.height / 2f)
+                    )
+                }
+        )
+
+        // 圆形玻璃滑块（纯显示，位置由 value 驱动，不承担任何手势——手势在下方整条触控层）
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .offset { IntOffset(thumbX.roundToInt(), thumbTop.roundToInt()) }
+                // 纯白实心滑块 + 细描边（iOS Slider），拖动时轻微放大
+                .graphicsLayer {
+                    scaleX = thumbScale
+                    scaleY = thumbScale
+                }
+                .shadow(
+                    elevation = 2.dp,
+                    shape = CircleShape,
+                    clip = false,
+                    spotColor = Color.Black.copy(alpha = 0.16f),
+                    ambientColor = Color.Black.copy(alpha = 0.08f)
+                )
+                .clip(CircleShape)
+                .background(IOSPalette.card)
+                .drawBehind {
+                    drawCircle(
+                        color = Color.Black.copy(alpha = 0.10f),
+                        radius = size.minDimension * 0.5f,
+                        center = this.center,
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                }
+        )
+
+        // 全宽触控层（最上层）：
+        //   pointerInput 挂在「整条轨道」而非移动的滑块上——
+        //   拖动时坐标原点相对整条固定，从任意位置按住都可滑，根治「拖不动」。
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .matchParentSize()
+                .pointerInput(intervals) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        dragging = true
+                        fun fracOf(x: Float): Float =
+                            (x / trackW.coerceAtLeast(1f)).coerceIn(0f, 1f)
+
+                        onValueChange(valueFromFraction(fracOf(down.position.x)))
+                        drag(down.id) { change ->
+                            change.consume()
+                            val f = fracOf(change.position.x)
+                            onValueChange(valueFromFraction(f))
+                        }
+                        dragging = false
+                        onValueChangeFinished?.invoke()
+                    }
+                }
+        )
+    }
+}
+
+/** 主按钮微光扫过：一道高光带周期性从左至右掠过 */
+@Composable
+fun Modifier.shimmerSweep(
+    periodMillis: Int = 2800,
+    bandColor: Color = Color.White
+): Modifier {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val progress by transition.animateFloat(
+        initialValue = -0.6f,
+        targetValue = 1.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(periodMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerX"
+    )
+    return this.drawBehind {
+        val bandWidth = size.width * 0.42f
+        val x0 = progress * size.width
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    bandColor.copy(alpha = 0.28f),
+                    Color.Transparent
+                ),
+                start = Offset(x0, 0f),
+                end = Offset(x0 + bandWidth, size.height)
+            )
+        )
+    }
+}
+
 /** 按压弹簧缩放（液态回弹手感） */
 @Composable
 fun Modifier.pressScale(
@@ -527,6 +890,211 @@ fun Modifier.pulse(minScale: Float = 0.85f, maxScale: Float = 1.18f, period: Int
 }
 
 // ====================================================================
+// L0 背景（游戏级渲染 · Game-Grade Ambient Render）
+//
+// 与主流 3A 游戏的环境渲染管线同思路的分层合成：
+//   1. Base Pass    四角多点深度渐变（非简单线性：暗角先行的体积底色）
+//   2. Light Pass   五团大尺度软光域（双层衰减 falloff 模拟散射体积光）
+//   3. Sweep Pass   极缓旋转的扫光（sweep gradient 模拟光源扫过）
+//   4. Horizon Pass 底部冷色地平线辉光 + 上下夹暗（景深压缩）
+//   5. Snow Pass    雪花粒子层（视差双层 + 摆动下落）
+//   6. Vignette     径向暗角（镜头光学特性，聚焦中央）
+//   7. Grain Pass   胶片颗粒噪声（Overlay 混合，消除渐变条带 = 真实感关键）
+// ====================================================================
+
+private data class AmbientBlob(
+    val color: Color,
+    val baseX: Float,          // 中心基础位置（0~1）
+    val baseY: Float,
+    val radius: Float,         // 相对短边的倍率
+    val driftAmp: Float,       // 漂移幅度
+    val phase: Float,          // 相位差
+    val maxAlpha: Float
+)
+
+/** 胶片颗粒噪声纹理（128×128 中灰抖动，创建一次全局复用；Overlay 混合下呈双向明暗颗粒） */
+private fun createNoiseBitmap(): ImageBitmap {
+    val size = 128
+    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val pixels = IntArray(size * size)
+    val rnd = kotlin.random.Random(42)
+    for (i in pixels.indices) {
+        // 围绕中灰 128 的对称抖动：Overlay 混合时 >128 提亮、<128 压暗
+        val g = 96 + rnd.nextInt(65)
+        pixels[i] = (0xFF shl 24) or (g shl 16) or (g shl 8) or g
+    }
+    bmp.setPixels(pixels, 0, size, 0, 0, size, size)
+    return bmp.asImageBitmap()
+}
+
+@Composable
+fun LiquidBackground(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "ambient")
+    val t by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2f * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(34_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ambientT"
+    )
+    val sweep by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2f * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(90_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sweepT"
+    )
+
+    val blobs = listOf(
+        AmbientBlob(Color(0xFF8A72FF), 0.14f, 0.20f, 1.45f, 0.11f, 0.00f, 0.38f), // 紫 · 左上
+        AmbientBlob(Color(0xFF4E74FF), 0.88f, 0.36f, 1.30f, 0.10f, 1.70f, 0.34f), // 蓝 · 右上
+        AmbientBlob(Color(0xFF35C8BE), 0.28f, 0.88f, 1.18f, 0.09f, 3.10f, 0.24f), // 青 · 左下
+        AmbientBlob(Color(0xFFB06A9E), 0.84f, 0.93f, 1.10f, 0.08f, 4.50f, 0.18f), // 玫瑰 · 右下
+        AmbientBlob(Color(0xFF5E6BD8), 0.52f, 0.55f, 1.60f, 0.06f, 2.40f, 0.16f)  // 靛 · 中央体积光
+    )
+
+    // 胶片颗粒：纹理只创建一次，ShaderBrush 平铺整屏
+    val grainBrush = remember {
+        val noise = createNoiseBitmap()
+        ShaderBrush(
+            ImageShader(
+                noise,
+                TileMode.Repeated,
+                TileMode.Repeated
+            )
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .drawBehind {
+                val minDim = size.minDimension
+
+                // ── 1. Base Pass：四角多点深度渐变 ──
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF101128),
+                            Color(0xFF171737),
+                            Color(0xFF1D1B3E),
+                            Color(0xFF252047)
+                        ),
+                        start = Offset.Zero,
+                        end = Offset(size.width, size.height)
+                    )
+                )
+                // 顶部再压一层深色，模拟镜头上缘进光衰减
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF0A0A1C).copy(alpha = 0.45f),
+                            Color.Transparent
+                        ),
+                        startY = 0f,
+                        endY = size.height * 0.30f
+                    )
+                )
+
+                // ── 2. Light Pass：五团软光域（双层衰减散射） ──
+                blobs.forEach { b ->
+                    val cx = size.width * (b.baseX + b.driftAmp * sin(t + b.phase))
+                    val cy = size.height * (b.baseY + b.driftAmp * cos(t * 0.8f + b.phase))
+                    val breathe = 0.82f + 0.18f * sin(t * 1.3f + b.phase)
+                    // 内核（亮）
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                b.color.copy(alpha = b.maxAlpha * breathe),
+                                b.color.copy(alpha = b.maxAlpha * 0.40f * breathe),
+                                Color.Transparent
+                            ),
+                            center = Offset(cx, cy),
+                            radius = minDim * b.radius * 0.62f
+                        ),
+                        radius = minDim * b.radius * 0.62f,
+                        center = Offset(cx, cy)
+                    )
+                    // 外层散射（宽而淡，模拟大气散射）
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                b.color.copy(alpha = b.maxAlpha * 0.22f * breathe),
+                                Color.Transparent
+                            ),
+                            center = Offset(cx, cy),
+                            radius = minDim * b.radius
+                        ),
+                        radius = minDim * b.radius,
+                        center = Offset(cx, cy)
+                    )
+                }
+
+                // ── 3. Sweep Pass：极缓旋转扫光 ──
+                val sweepCx = size.width * 0.5f
+                val sweepCy = size.height * 0.34f
+                val sweepColors = List(12) { i ->
+                    val a = 0.030f + 0.030f * sin(sweep + i * (PI / 6f).toFloat())
+                    Color.White.copy(alpha = a.coerceAtLeast(0f))
+                }
+                drawCircle(
+                    brush = Brush.sweepGradient(colors = sweepColors, center = Offset(sweepCx, sweepCy)),
+                    radius = minDim * 1.4f,
+                    center = Offset(sweepCx, sweepCy)
+                )
+
+                // ── 4. Horizon Pass：底部冷色地平线 + 上下夹暗 ──
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF3B4E8F).copy(alpha = 0.14f),
+                            Color.Transparent
+                        ),
+                        startY = size.height * 0.72f,
+                        endY = size.height
+                    )
+                )
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF08081A).copy(alpha = 0.50f),
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color(0xFF0A0A20).copy(alpha = 0.58f)
+                        ),
+                        startY = 0f,
+                        endY = size.height
+                    )
+                )
+
+                // ── 6. Vignette：径向暗角（镜头光学） ──
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color(0xFF05050F).copy(alpha = 0.42f)
+                        ),
+                        center = Offset(size.width * 0.5f, size.height * 0.46f),
+                        radius = minDim * 1.05f
+                    )
+                )
+
+                // ── 7. Grain Pass：胶片颗粒（Overlay 混合去条带） ──
+                drawRect(
+                    brush = grainBrush,
+                    alpha = 0.045f,
+                    blendMode = androidx.compose.ui.graphics.BlendMode.Overlay
+                )
+            }
+    )
+}
+
+// ====================================================================
 // 应用背景（AppBackground · 可自定义）
 //
 // 四种模式（设置页可切换，默认液态动态背景）：
@@ -635,6 +1203,260 @@ private fun FlatBackground(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .background(IOSPalette.groupedBackground)
+    )
+}
+
+// ====================================================================
+// 雪花层（Snowfall · 真实降雪 · 前景覆盖）
+//
+// 三层景深模拟真实雪幕：
+//   · 远景 34 片：小而慢的失焦光斑（大虚化 → 空气纵深）
+//   · 中景 30 片：柔光雪粒（下落轨迹清晰可辨）
+//   · 近景 20 片：六臂晶体雪花（描线结晶 + 各自自转）
+// 真实感细节：
+//   · 双频正弦摆动（两支不同频率叠加 → 无规律自然漂移）
+//   · 阵风场：整层慢速左右漂移，远近层位移不同（视差）
+//   · 闪烁：每片透明度低频呼吸（雪晶折射的微光变化）
+//   · 旋转：晶体自转（每周期整数圈 → t 回绕时连续不跳变）
+//   · 层次透明度：近景最亮、远景朦胧（相机景深）
+// ====================================================================
+
+private data class Snowflake(
+    val x0: Float,          // 基础横坐标（0~1）
+    val y0: Float,          // 基础纵坐标（0~1）
+    val radius: Float,      // 半径（相对短边倍率）
+    val speed: Int,         // 每周期下落整屏数（整数保证循环连续）
+    val sway1: Float,       // 主摆动幅度
+    val sway2: Float,       // 次摆动幅度
+    val swayFreq2: Int,     // 次摆频（整数保证循环连续）
+    val phase: Float,       // 相位
+    val alpha: Float,       // 基础透明度
+    val twinkleFreq: Int,   // 闪烁频率（整数）
+    val twinklePhase: Float,
+    val spinTurns: Int,     // 每周期自转整圈数（0 = 不转）
+    val spinDir: Float,     // 自转方向 ±1
+    val layer: Int          // 0 远景 1 中景 2 近景
+)
+
+/** 六臂晶体雪花路径（单位坐标，中心原点，臂长 1） */
+private fun buildCrystalPath(): Path {
+    val p = Path()
+    val armCount = 6
+    repeat(armCount) { i ->
+        val a = i * (PI / 3f).toFloat()
+        val dx = cos(a)
+        val dy = sin(a)
+        // 主臂：中心 → 尖端
+        p.moveTo(0f, 0f)
+        p.lineTo(dx, dy)
+        // 一级侧枝（臂长 55% 处，±60° 分叉）
+        val b1x = dx * 0.55f
+        val b1y = dy * 0.55f
+        val ba = (PI / 3f).toFloat()
+        val l1 = 0.30f
+        p.moveTo(b1x, b1y)
+        p.lineTo(b1x + cos(a + ba) * l1, b1y + sin(a + ba) * l1)
+        p.moveTo(b1x, b1y)
+        p.lineTo(b1x + cos(a - ba) * l1, b1y + sin(a - ba) * l1)
+        // 二级小枝（臂长 82% 处）
+        val b2x = dx * 0.82f
+        val b2y = dy * 0.82f
+        val l2 = 0.17f
+        p.moveTo(b2x, b2y)
+        p.lineTo(b2x + cos(a + ba) * l2, b2y + sin(a + ba) * l2)
+        p.moveTo(b2x, b2y)
+        p.lineTo(b2x + cos(a - ba) * l2, b2y + sin(a - ba) * l2)
+    }
+    return p
+}
+
+@Composable
+fun SnowfallLayer(
+    modifier: Modifier = Modifier,
+    farCount: Int = 34,
+    midCount: Int = 30,
+    nearCount: Int = 20
+) {
+    val transition = rememberInfiniteTransition(label = "snow")
+    val t by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(26_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "snowT"
+    )
+
+    val crystalPath = remember { buildCrystalPath() }
+
+    val flakes = remember(farCount, midCount, nearCount) {
+        val rnd = kotlin.random.Random(2026)
+        buildList {
+            // 远景：小 / 慢 / 朦胧失焦
+            repeat(farCount) {
+                add(
+                    Snowflake(
+                        x0 = rnd.nextFloat(), y0 = rnd.nextFloat(),
+                        radius = 0.5f + rnd.nextFloat() * 0.8f,
+                        speed = 1,
+                        sway1 = 0.004f + rnd.nextFloat() * 0.007f,
+                        sway2 = 0.002f + rnd.nextFloat() * 0.004f,
+                        swayFreq2 = if (rnd.nextBoolean()) 2 else 3,
+                        phase = rnd.nextFloat() * (2f * PI).toFloat(),
+                        alpha = 0.10f + rnd.nextFloat() * 0.18f,
+                        twinkleFreq = 1 + rnd.nextInt(2),
+                        twinklePhase = rnd.nextFloat() * (2f * PI).toFloat(),
+                        spinTurns = 0, spinDir = 1f, layer = 0
+                    )
+                )
+            }
+            // 中景：中等 / 柔光雪粒
+            repeat(midCount) {
+                add(
+                    Snowflake(
+                        x0 = rnd.nextFloat(), y0 = rnd.nextFloat(),
+                        radius = 1.0f + rnd.nextFloat() * 1.3f,
+                        speed = if (rnd.nextBoolean()) 1 else 2,
+                        sway1 = 0.009f + rnd.nextFloat() * 0.014f,
+                        sway2 = 0.004f + rnd.nextFloat() * 0.008f,
+                        swayFreq2 = if (rnd.nextBoolean()) 2 else 3,
+                        phase = rnd.nextFloat() * (2f * PI).toFloat(),
+                        alpha = 0.22f + rnd.nextFloat() * 0.30f,
+                        twinkleFreq = 2 + rnd.nextInt(3),
+                        twinklePhase = rnd.nextFloat() * (2f * PI).toFloat(),
+                        spinTurns = 0, spinDir = 1f, layer = 1
+                    )
+                )
+            }
+            // 近景：大 / 快 / 六臂晶体 + 自转
+            repeat(nearCount) {
+                add(
+                    Snowflake(
+                        x0 = rnd.nextFloat(), y0 = rnd.nextFloat(),
+                        radius = 2.2f + rnd.nextFloat() * 2.8f,
+                        speed = 3 + rnd.nextInt(2),
+                        sway1 = 0.016f + rnd.nextFloat() * 0.022f,
+                        sway2 = 0.008f + rnd.nextFloat() * 0.012f,
+                        swayFreq2 = 2 + rnd.nextInt(2),
+                        phase = rnd.nextFloat() * (2f * PI).toFloat(),
+                        alpha = 0.48f + rnd.nextFloat() * 0.40f,
+                        twinkleFreq = 3 + rnd.nextInt(3),
+                        twinklePhase = rnd.nextFloat() * (2f * PI).toFloat(),
+                        spinTurns = 1 + rnd.nextInt(2),
+                        spinDir = if (rnd.nextBoolean()) 1f else -1f,
+                        layer = 2
+                    )
+                )
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .drawBehind {
+                val w = size.width
+                val h = size.height
+                val shortSide = size.minDimension
+                val tau = (2f * PI).toFloat()
+
+                // 阵风场：双频叠加的缓慢左右漂移
+                val gust = 0.016f * sin(tau * t + 0.7f) + 0.008f * sin(tau * 2f * t)
+
+                flakes.forEach { f ->
+                    // 纵向取模循环（整数速度 → 回绕连续）
+                    val yNorm = (f.y0 + t * f.speed) % 1f
+                    // 入屏 / 出屏渐隐（上下 8% 区域）
+                    val edgeFade = when {
+                        yNorm < 0.08f -> yNorm / 0.08f
+                        yNorm > 0.92f -> (1f - yNorm) / 0.08f
+                        else -> 1f
+                    }
+                    // 双频摆动 + 视差风场（远景受风影响小）
+                    val windScale = when (f.layer) {
+                        0 -> 0.45f
+                        1 -> 0.80f
+                        else -> 1f
+                    }
+                    val sway = f.sway1 * sin(tau * t + f.phase) +
+                            f.sway2 * sin(tau * f.swayFreq2 * t + f.phase * 1.7f)
+                    val cx = w * (f.x0 + gust * windScale + sway)
+                    val cy = h * yNorm
+                    val r = shortSide * f.radius * 0.0058f
+                    // 闪烁（±25% 低频呼吸）
+                    val tw = 0.75f + 0.25f * sin(tau * f.twinkleFreq * t + f.twinklePhase)
+                    val a = (f.alpha * tw).coerceIn(0f, 1f) * edgeFade
+                    if (a <= 0.01f) return@forEach
+
+                    when (f.layer) {
+                        0 -> {
+                            // 远景：失焦光斑（径向渐变虚化圆）
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = a * 0.55f),
+                                        Color.White.copy(alpha = a * 0.22f),
+                                        Color.Transparent
+                                    ),
+                                    center = Offset(cx, cy),
+                                    radius = r * 3.2f
+                                ),
+                                radius = r * 3.2f,
+                                center = Offset(cx, cy)
+                            )
+                        }
+
+                        1 -> {
+                            // 中景：柔光雪粒（核 + 辉光）
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = a),
+                                        Color.White.copy(alpha = a * 0.40f),
+                                        Color.Transparent
+                                    ),
+                                    center = Offset(cx, cy),
+                                    radius = r * 2.2f
+                                ),
+                                radius = r * 2.2f,
+                                center = Offset(cx, cy)
+                            )
+                        }
+
+                        else -> {
+                            // 近景：六臂晶体（自转）+ 底层柔光
+                            val spinDeg = f.spinDir * (360f * t * f.spinTurns + f.phase * 57.29578f)
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = a * 0.16f),
+                                        Color.Transparent
+                                    ),
+                                    center = Offset(cx, cy),
+                                    radius = r * 2.6f
+                                ),
+                                radius = r * 2.6f,
+                                center = Offset(cx, cy)
+                            )
+                            withTransform({
+                                translate(cx, cy)
+                                rotate(spinDeg, pivot = Offset.Zero)
+                                scale(r, r, pivot = Offset.Zero)
+                            }) {
+                                drawPath(
+                                    path = crystalPath,
+                                    color = Color.White.copy(alpha = a),
+                                    style = Stroke(
+                                        width = 0.11f,
+                                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
     )
 }
 
@@ -1448,6 +2270,96 @@ fun GlassNavBar(
 //   · 与主导航胶囊物理分离、独立成圆
 //   · 纯图标无文字（46dp 触控友好）
 //   · 激活时高亮白玻璃底 + 实心深色图标（与导航选中态同规格）
+// ====================================================================
+
+@Composable
+fun GlassFabButton(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 46.dp,
+    iconSize: Dp = 20.dp
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val iconColor by animateColorAsState(
+        targetValue = if (selected) Color(0xFFF3F5FA)
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+        animationSpec = tween(240),
+        label = "fabIconColor"
+    )
+    val iconRotation by animateFloatAsState(
+        targetValue = if (selected) 90f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 260f),
+        label = "fabIconRotation"
+    )
+    val idleColors = rememberGlassColors()
+    // 激活态：提亮玻璃（半透明白玻璃 + 亮边环 + 浅色图标），与整体液态玻璃同语言
+    val activeColors = GlassColors(
+        tintTop = Color.White.copy(alpha = 0.24f),
+        tintBottom = Color.White.copy(alpha = 0.10f),
+        highlight = Color.White.copy(alpha = 0.40f),
+        rimBright = Color.White.copy(alpha = 0.80f),
+        rimDim = Color.Black.copy(alpha = 0.12f)
+    )
+    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val fabPressed by interaction.collectIsPressedAsState()
+    val fabPressScale by animateFloatAsState(
+        targetValue = if (fabPressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
+        label = "fabPressScale"
+    )
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .graphicsLayer {
+                // 激活时轻微放大，强化「卫星按钮」选中感
+                val s = if (selected) 1.06f else 1f
+                scaleX = s
+                scaleY = s
+            }
+            .glow(
+                if (selected) Color.White.copy(alpha = 0.35f) else Color.Transparent,
+                radiusFraction = 1.4f
+            )
+            .liquidGlass(
+                shape = CircleShape,
+                blurRadius = 10.dp,
+                lensHeight = 10.dp,
+                lensAmount = 20.dp,
+                // 按压缩放走 layerBlock：背景折射不跟手缩放
+                layerBlock = {
+                    val s = fabPressScale
+                    scaleX = s
+                    scaleY = s
+                }
+            )
+            .glass(CircleShape, if (selected) activeColors else idleColors)
+            .pressRipple(
+                interaction,
+                clipShape = CircleShape,
+                color = if (selected) Color(0xFFD9DEEB) else Color.White,
+                intensity = 1.25f
+            )
+            .clickable(interactionSource = interaction, indication = null) {
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = iconColor,
+            modifier = Modifier
+                .size(iconSize)
+                .graphicsLayer { rotationZ = iconRotation }
+        )
+    }
+}
+
 // ====================================================================
 // 交错入场动画
 // ====================================================================
