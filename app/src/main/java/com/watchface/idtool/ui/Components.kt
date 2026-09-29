@@ -2090,7 +2090,8 @@ fun GlassNavBar(
                                     }
                                     val f = indexAt(change.position.x)
                                     dragSlot = f
-                                    previewIndex = f.roundToInt().coerceIn(0, tabs.size - 1)
+                                    previewIndex = if (tabs.isEmpty()) -1
+                                    else f.roundToInt().coerceIn(0, tabs.size - 1)
                                     change.consume()
                                 }
                             } finally {
