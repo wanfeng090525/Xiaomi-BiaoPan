@@ -188,7 +188,6 @@ fun SettingsScreen(
         Spacer(Modifier.height(10.dp))
         StaggeredItem(index = 6) {
             val bgCfg = AppSettings.bgConfig
-            val snowOn = AppSettings.snowEnabled
 
             GlassCard(contentPadding = 6.dp) {
                 SettingsRow(
@@ -213,14 +212,6 @@ fun SettingsScreen(
                         onClick = { showColorDialog = true }
                     )
                 }
-                SettingsDivider()
-                SettingsSwitchRow(
-                    icon = Icons.Default.AcUnit,
-                    title = "雪花飘落",
-                    subtitle = if (snowOn) "已开启全屏雪花特效" else "已关闭",
-                    checked = snowOn,
-                    onCheckedChange = { AppSettings.setSnowEnabled(context, it) }
-                )
             }
         }
 

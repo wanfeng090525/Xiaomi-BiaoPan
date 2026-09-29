@@ -57,7 +57,7 @@ import com.watchface.idtool.ui.LocalAppBackdrop
 import com.watchface.idtool.ui.ModifyScreen
 import com.watchface.idtool.ui.ResultDialog
 import com.watchface.idtool.ui.SettingsScreen
-import com.watchface.idtool.ui.SnowfallLayer
+
 import com.watchface.idtool.ui.ToastMessage
 import com.watchface.idtool.ui.WatchFaceTheme
 import com.watchface.idtool.ui.WelcomeScreen
@@ -284,7 +284,7 @@ private fun AppContent() {
                 }
             }
 
-            // L2 悬浮玻璃导航栏（浅色磨砂 Dock：图标在上文字在下，4 个界面）
+            // L2 底部 TabBar（iOS 白色悬浮胶囊 + 右侧圆形搜索按钮）
             GlassNavBar(
                 tabs = listOf(
                     GlassNavTab(Icons.Default.Home, "主页"),
@@ -309,11 +309,12 @@ private fun AppContent() {
                         }
                     )
                 },
+                onSearchClick = {
+                    viewModel.showToast("搜索功能开发中")
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    // 左右各 60dp → dock 居中占 ~67% 屏宽（不撑满，酷安头条比例）
-                    // 底部 24dp → 与系统导航条之间留出浮岛感
-                    .padding(start = 60.dp, end = 60.dp, bottom = 24.dp)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
             )
 
             if (isRestoring || state.isLoading) {
@@ -333,12 +334,7 @@ private fun AppContent() {
             }
         }
 
-        // L3 雪花前景：设置中可开关；覆盖在内容与导航之上
-        if (com.watchface.idtool.AppSettings.snowEnabled) {
-            SnowfallLayer()
-        }
-
-        // L4 全局点击光效：View 层监听 · 零拦截 · 最顶层绘制
+        // L3 全局点击光效：View 层监听 · 零拦截 · 最顶层绘制
         GlobalRippleOverlay()
         }
     }
