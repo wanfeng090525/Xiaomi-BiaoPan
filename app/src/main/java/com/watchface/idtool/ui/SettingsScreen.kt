@@ -444,8 +444,8 @@ private fun LoginStatusSection() {
             AppColors.successAdaptive(),
             "已登录",
             buildString {
-                if (kamiMask.isNotEmpty()) append("卡密：$kamiMask  ")
-                if (endTime.isNotEmpty()) append("到期：$endTime")
+                if (kamiMask.isNotEmpty()) append(AppLocale.tf("卡密：{0}", kamiMask) + "  ")
+                if (endTime.isNotEmpty()) append(AppLocale.tf("到期：{0}", endTime))
                 else append("可使用全部功能")
             }
         )

@@ -13,6 +13,7 @@ import com.weiyan.sdk.WYVersionResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import com.watchface.idtool.ui.AppLocale
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -122,7 +123,7 @@ object SagAuthManager {
             wy = WYVerify(WY_KEY)
             true
         } catch (e: Throwable) {
-            lastError = "微验初始化失败: ${e.message}"
+            lastError = AppLocale.tf("微验初始化失败: {0}", e.message ?: "")
             false
         }
     }
@@ -378,7 +379,7 @@ object SagAuthManager {
                 currentToken = r.token
                 currentKamiMasked = maskKami(card)
                 endTime = when {
-                    r.type == "single" -> "次数卡(${r.remain})"
+                    r.type == "single" -> AppLocale.tf("次数卡({0})", r.remain)
                     r.endTime > 0 -> formatEndTime(r.endTime)
                     else -> ""
                 }
@@ -392,9 +393,9 @@ object SagAuthManager {
                     .apply()
                 // 登录成功后自动启动心跳
                 startHeartbeat(context)
-                val tip = if (cardTypeName.isNotEmpty()) "（$cardTypeName）" else ""
-                val end = if (endTime.isNotEmpty()) "，$endTime" else ""
-                AuthResult(true, "登录成功$tip$end", endTime = endTime)
+                val tip = if (cardTypeName.isNotEmpty()) AppLocale.tf("（{0}）", cardTypeName) else ""
+                val end = if (endTime.isNotEmpty()) AppLocale.tf("，{0}", endTime) else ""
+                AuthResult(true, AppLocale.tf("登录成功{0}{1}", tip, end), endTime = endTime)
             } else {
                 lastError = (r.msg ?: "").ifBlank { "登录失败" }
                 if (!fromRestore) setLoginState(false)
@@ -432,14 +433,14 @@ object SagAuthManager {
                 val r: WYUnbindResult = v.unbind(card, getMachineCode(context))
                 logout(context)
                 if (r.success) {
-                    val remain = if (r.remain > 0) "（剩余解绑次数：${r.remain}）" else ""
-                    AuthResult(true, "已退出登录（设备已解绑）$remain")
+                    val remain = if (r.remain > 0) AppLocale.tf("（剩余解绑次数：{0}）", r.remain) else ""
+                    AuthResult(true, AppLocale.tf("已退出登录（设备已解绑）{0}", remain))
                 } else {
-                    AuthResult(true, "已退出登录（${(r.msg ?: "").ifBlank { "解绑失败" }}）")
+                    AuthResult(true, AppLocale.tf("已退出登录（{0}）", (r.msg ?: "").ifBlank { AppLocale.t("解绑失败") }))
                 }
             } catch (e: Exception) {
                 logout(context)
-                AuthResult(true, "已退出登录（${e.message ?: "解绑异常"}）")
+                AuthResult(true, AppLocale.tf("已退出登录（{0}）", e.message ?: AppLocale.t("解绑异常")))
             }
         }
 

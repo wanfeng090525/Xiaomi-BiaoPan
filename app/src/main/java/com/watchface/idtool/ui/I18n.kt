@@ -259,7 +259,76 @@ object AppLocale {
         "信标密钥" to "Beacon Key", "IRQ密钥" to "IRQ Key", "设备ID" to "Device ID",
         "华米认证密钥" to "Huami Auth Key", "原始文件数" to "Total files",
         "扫描日志文件数" to "Scanned log files", "密钥类型" to "Key Type",
-        "复制所有密钥" to "Copy All Keys", "清空结果" to "Clear Results"
+        "复制所有密钥" to "Copy All Keys", "清空结果" to "Clear Results",
+        // ---- 卡密登录（设置页 + 验证 SDK）----
+        "卡密登录" to "License Login", "卡密" to "License Key", "登录" to "Log In",
+        "登录中…" to "Logging in…", "已登录" to "Logged In", "未登录" to "Not Logged In",
+        "点击此处输入卡密登录" to "Tap here to enter your license key",
+        "输入授权卡密以解锁全部功能" to "Enter your license key to unlock all features",
+        "请输入卡密" to "Please enter the license key",
+        "取消解锁" to "Cancel Unlock", "处理中…" to "Processing…",
+        "可使用全部功能" to "All features available",
+        "卡密：{0}" to "Key: {0}", "到期：{0}" to "Expires: {0}", "，{0}" to ", {0}",
+        "登录成功{0}{1}" to "Login successful{0}{1}", "（{0}）" to " ({0})",
+        "登录失败" to "Login failed", "登录异常" to "Login error",
+        "心跳失败" to "Heartbeat failed", "过期" to "Expired",
+        "已退出登录" to "Logged out",
+        "已退出登录（{0}）" to "Logged out ({0})",
+        "已退出登录（设备已解绑）{0}" to "Logged out (device unbound){0}",
+        "（剩余解绑次数：{0}）" to " (unbindings left: {0})",
+        "次数卡({0})" to "Count card ({0})",
+        "免费卡" to "Free card", "时卡" to "Hourly card", "天卡" to "Daily card",
+        "周卡" to "Weekly card", "月卡" to "Monthly card", "季卡" to "Quarterly card",
+        "年卡" to "Yearly card", "永久卡" to "Lifetime card", "次数卡" to "Count card",
+        "解绑失败" to "Unbind failed", "解绑异常" to "Unbind error",
+        "SDK 初始化失败" to "SDK initialization failed",
+        "验证未初始化：缺少 Context" to "Verification not initialized: missing Context",
+        "验证已关闭（调试）" to "Verification disabled (debug)",
+        "微验初始化失败: {0}" to "Verification init failed: {0}",
+        "正在验证会话…" to "Verifying session…",
+        "请先在设置中登录卡密后再使用此功能" to "Please log in with your license key in Settings first",
+        // ---- 权限说明（设置页 + 首页）----
+        "文件权限可用" to "File permission available",
+        "文件权限已激活" to "File permission granted",
+        "已授予所有文件访问，可无 Root 导入" to "All-files access granted; import works without Root",
+        "可授权「所有文件访问」或 Root / Shizuku" to "Grant \"All files access\", or use Root / Shizuku",
+        "可授权「所有文件访问」或使用 Root/Shizuku" to "Grant \"All files access\", or use Root/Shizuku",
+        "通过 Shizuku / ADB 授权" to "Authorize via Shizuku / ADB",
+        "Shizuku: 安装并启动 Shizuku 服务后\n点击下方按钮授权" to
+                "Shizuku: install & start the Shizuku service,\nthen tap the button below to authorize",
+        "一键导入需要 Root 或 Shell 权限。\n" to "One-tap import requires Root or Shell permission.\n",
+        "请通过 Shizuku 授权或确保设备已 Root。\n\n" to
+                "Authorize via Shizuku or make sure the device is rooted.\n\n",
+        // ---- 更新弹窗（海洋风）----
+        "发现软件新版本" to "New version available",
+        "XiaomBP {0} 带来更稳定、更流畅的使用体验。" to
+                "XiaomBP {0} brings a more stable and smoother experience.",
+        "下载并安装" to "Download & Install", "稍后安装" to "Later",
+        "查看详情" to "View Details", " 查看详情" to " View Details",
+        "设备：{0}" to "Device: {0}", "设备：未知" to "Device: Unknown",
+        "发现新版本 {0}（暂无下载地址）" to "New version {0} found (no download URL yet)",
+        "\n文件已保存到 Download 目录" to "\nFile saved to the Download folder",
+        // ---- 设置页其他 ----
+        "Github 仓库" to "GitHub Repository", "查看开源仓库" to "View Open-Source Repo",
+        "正在获取公告…" to "Loading announcement…",
+        // ---- 密钥提取补充 ----
+        "已提取 {0} 个 Token（{1}）" to "Extracted {0} Token(s) ({1})",
+        "未找到 .bin 文件，可尝试授权 Root/Shizuku 后重试" to
+                "No .bin files found; try granting Root/Shizuku and retry",
+        "文件不存在: {0}" to "File not found: {0}",
+        "请提供 ZIP 日志包或 .log 文件" to "Please provide a ZIP log package or .log file",
+        "手环" to "Band", "手表" to "Watch", "秤" to "Scale", "黑鲨" to "Black Shark",
+        // ---- 每日一言（纤句兜底语录）----
+        "凡是过往，皆为序章。" to "What's past is prologue.",
+        "我们的征途，是星辰大海。" to "Our journey is the sea of stars.",
+        "万物皆有裂痕，那是光照进来的地方。" to "There is a crack in everything, that's how the light gets in.",
+        "慢慢来，比较快。" to "Slow down and you'll get there faster.",
+        "保持热爱，奔赴山海。" to "Stay passionate, chase mountains and seas.",
+        "精益求精，止于至善。" to "Strive for excellence, pursue perfection.",
+        "山高路远，看世界，也找自己。" to "Over high hills and long roads — see the world, find yourself.",
+        "每个不曾起舞的日子，都是对生命的辜负。" to "Every day not danced is a day betrayed to life.",
+        "莎士比亚" to "Shakespeare", "尼采" to "Nietzsche", "莱昂纳德·科恩" to "Leonard Cohen",
+        "银河英雄传说" to "Legend of the Galactic Heroes"
     )
 }
 

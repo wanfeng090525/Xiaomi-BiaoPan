@@ -120,7 +120,7 @@ class LogKeyExtractor(private val inputFile: File) {
         if (!inputFile.exists()) {
             return ExtractResult(
                 success = false,
-                errorMessage = "文件不存在: ${inputFile.absolutePath}"
+                errorMessage = com.watchface.idtool.ui.AppLocale.tf("文件不存在: {0}", inputFile.absolutePath)
             )
         }
         return try {

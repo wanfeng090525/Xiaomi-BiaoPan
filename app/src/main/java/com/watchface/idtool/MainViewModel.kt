@@ -344,7 +344,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             )
                             hasUpdate -> _uiState.value.copy(
                                 isCheckingCloud = false,
-                                toastMessage = "发现新版本 ${config.latestVersion}（暂无下载地址）"
+                                toastMessage = AppLocale.tf("发现新版本 {0}（暂无下载地址）", config.latestVersion)
                             )
                             else -> _uiState.value.copy(
                                 isCheckingCloud = false,
@@ -1099,7 +1099,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
         val file = File(downloadsDir, fileName)
         if (!file.exists()) {
-            _uiState.value = _uiState.value.copy(toastMessage = AppLocale.tf("文件不存在: Download/{0}", fileName))
+            _uiState.value = _uiState.value.copy(toastMessage = AppLocale.tf("文件不存在: {0}", "Download/$fileName"))
             return null
         }
         val uri = FileProvider.getUriForFile(getApplication(), "${getApplication<Application>().packageName}.fileprovider", file)

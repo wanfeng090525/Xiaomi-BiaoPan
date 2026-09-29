@@ -220,21 +220,9 @@ private fun AppContent() {
                                     animationSpec = tween(300, easing = FastOutSlowInEasing)
                                 )
                         enter togetherWith exit
-                    } else if (initialState == "settings") {
-                        // 离开设置：设置页缩回淡出，目标页按方向滑入
-                        val enter = fadeIn(tween(300, easing = FastOutSlowInEasing)) +
-                                slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) {
-                                    if (forward) it / 4 else -it / 4
-                                }
-                        val exit = fadeOut(tween(240)) +
-                                scaleOut(
-                                    targetScale = 0.95f,
-                                    animationSpec = tween(280, easing = FastOutSlowInEasing)
-                                ) +
-                                slideOutVertically(tween(280, easing = FastOutSlowInEasing)) { it / 9 }
-                        enter togetherWith exit
                     } else {
-                        // 主页面之间：保持原有方向感知的水平滑动
+                        // 统一转场：主页面之间 + 离开设置页，均为方向感知的水平滑动
+                        // （此前离开设置页走独立的缩放下沉 spec，实机上动画不生效，统一后与可用路径一致）
                         val enter = fadeIn(tween(320, easing = FastOutSlowInEasing)) +
                                 slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) {
                                     if (forward) it / 4 else -it / 4

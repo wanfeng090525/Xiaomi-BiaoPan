@@ -1192,7 +1192,7 @@ internal fun UpdateDialog(
                     )
                     val annotated = buildAnnotatedString {
                         withStyle(descStyle) {
-                            append("XiaomBP $latestVersion 带来更稳定、更流畅的使用体验。")
+                            append(AppLocale.tf("XiaomBP {0} 带来更稳定、更流畅的使用体验。", latestVersion))
                         }
                         pushStringAnnotation(tag = "URL", annotation = releaseUrl)
                         withStyle(linkStyle) { append(" 查看详情") }
@@ -2006,7 +2006,7 @@ private fun KeyRow(
             // 设备名称（提取结果处重点展示）
             if (subtitle.isNotEmpty()) {
                 Text(
-                    text = "设备：$subtitle",
+                    text = AppLocale.tf("设备：{0}", subtitle),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AppColors.success,
