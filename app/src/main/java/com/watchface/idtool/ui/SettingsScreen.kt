@@ -167,7 +167,7 @@ fun SettingsScreen(
         StaggeredItem(index = 4) {
             val savedLang = AppLocale.savedLang
             val langNative = AppLocale.LOCALES.firstOrNull { it.code == savedLang }?.native ?: "简体中文"
-            GlassCard(contentPadding = 6.dp) {
+            InsetGroup {
                 SettingsRow(
                     icon = Icons.Default.Language,
                     iconTint = MaterialTheme.colorScheme.primary,
@@ -189,7 +189,7 @@ fun SettingsScreen(
         StaggeredItem(index = 6) {
             val bgCfg = AppSettings.bgConfig
 
-            GlassCard(contentPadding = 6.dp) {
+            InsetGroup {
                 SettingsRow(
                     icon = Icons.Default.Wallpaper,
                     iconTint = MaterialTheme.colorScheme.primary,
@@ -221,7 +221,7 @@ fun SettingsScreen(
         StaggeredItem(index = 7) { SectionLabel("应用与更新") }
         Spacer(Modifier.height(10.dp))
         StaggeredItem(index = 8) {
-            GlassCard(contentPadding = 6.dp) {
+            InsetGroup {
                 SettingsRow(
                     icon = Icons.Default.CloudDownload,
                     iconTint = AppColors.successAdaptive(),
@@ -457,35 +457,27 @@ private fun SectionLabel(text: String) {
     Text(
         text = text,
         fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-        letterSpacing = 0.3.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 6.dp)
+        fontWeight = FontWeight.Normal,
+        color = IOSPalette.secondaryLabel,
+        modifier = Modifier.padding(start = 32.dp, top = 22.dp, bottom = 7.dp)
     )
 }
 
-/** 透明玻璃图标容器（玻璃容器 + 实心中性图标，无彩色规格） */
+/** iOS 彩色圆角瓦片图标容器 */
 @Composable
-private fun IconBadge(icon: ImageVector, tint: Color, size: androidx.compose.ui.unit.Dp = 38.dp) {
+private fun IconBadge(icon: ImageVector, tint: Color, size: androidx.compose.ui.unit.Dp = 29.dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
-            .glow(Color.White.copy(alpha = 0.15f), radiusFraction = 1.5f)
-            .liquidGlass(
-                CircleShape,
-                blurRadius = 4.dp,
-                lensHeight = 6.dp,
-                lensAmount = 10.dp
-            )
-            .glass(CircleShape, rememberGlassColors()),
+            .clip(RoundedCornerShape(IOSPalette.tileRadius))
+            .background(tint),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             icon,
             contentDescription = null,
-            tint = Color(0xFFE9EBF4),
-            modifier = Modifier.size(size * 0.5f)
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.6f)
         )
     }
 }
@@ -498,39 +490,14 @@ private fun SettingsRow(
     subtitle: String,
     onClick: () -> Unit
 ) {
-    GlassCard(
-        onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        contentPadding = 13.dp
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconBadge(icon, iconTint)
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-    }
+    InsetListItem(
+        title = title,
+        subtitle = subtitle,
+        tileIcon = icon,
+        tileTint = iconTint,
+        showArrow = true,
+        onClick = onClick
+    )
 }
 
 @Composable
@@ -538,22 +505,13 @@ private fun SettingsDivider() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 2.dp)
-            .height(1.dp)
-            .glass(
-                RoundedCornerShape(1.dp),
-                GlassColors(
-                    tintTop = Color.White.copy(alpha = 0.06f),
-                    tintBottom = Color.Transparent,
-                    highlight = Color.Transparent,
-                    rimBright = Color.Transparent,
-                    rimDim = Color.Transparent
-                )
-            )
+            .padding(start = 57.dp)
+            .height(0.5.dp)
+            .background(IOSPalette.separator)
     )
 }
 
-/** 开关行：透明玻璃图标容器 + 标题/副标题 + 玻璃质感 Switch */
+/** 开关行：iOS InsetListItem + 系统蓝开关 */
 @Composable
 private fun SettingsSwitchRow(
     icon: ImageVector,
@@ -562,45 +520,14 @@ private fun SettingsSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 13.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconBadge(icon, Color.Transparent)
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = { next ->
-                onCheckedChange(next)
-            },
-            colors = SwitchDefaults.colors(
-                // 提亮玻璃轨道：半透明白 + 亮边环，浅色滑块（液态玻璃规格）
-                checkedTrackColor = Color.White.copy(alpha = 0.30f),
-                checkedThumbColor = Color(0xFFF3F5FA),
-                checkedBorderColor = Color.White.copy(alpha = 0.75f),
-                uncheckedTrackColor = Color.White.copy(alpha = 0.12f),
-                uncheckedThumbColor = Color(0xFF9AA1B5),
-                uncheckedBorderColor = Color.White.copy(alpha = 0.22f)
-            )
-        )
-    }
+    InsetListItem(
+        title = title,
+        subtitle = subtitle,
+        tileIcon = icon,
+        tileTint = IOSPalette.tileGray,
+        toggle = checked,
+        onToggle = onCheckedChange
+    )
 }
 
 /** 卡密登录状态：未登录点击卡片输入卡密登录；已登录可取消解锁 */

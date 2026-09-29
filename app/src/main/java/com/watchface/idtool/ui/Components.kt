@@ -1120,7 +1120,7 @@ fun AppBackground(modifier: Modifier = Modifier) {
     when (cfg.mode) {
         BgMode.LIQUID -> {
             // iOS 化：原「液态动态」霓虹渐变已废弃，统一改为分组列表底色
-            ColorBackground(IOSPalette.groupedBackground, bgModifier)
+            FlatBackground(bgModifier)
         }
 
         BgMode.COLOR -> ColorBackground(cfg.color, bgModifier)
@@ -1153,13 +1153,13 @@ fun AppBackground(modifier: Modifier = Modifier) {
                 PhotoScrim(bgModifier)
             } else {
                 // 图片尚未解码完成：分组列表底色兜底避免闪黑
-                ColorBackground(IOSPalette.groupedBackground, bgModifier)
+                FlatBackground(bgModifier)
             }
         }
 
         else -> {
             // 原「默认壁纸」已移除，历史遗留 DEFAULT / 未知模式统一兜底为分组列表底色
-            ColorBackground(IOSPalette.groupedBackground, bgModifier)
+            FlatBackground(bgModifier)
         }
     }
 }
@@ -1190,31 +1190,22 @@ private fun PhotoScrim(modifier: Modifier = Modifier) {
 /** 纯色背景：底色 + 径向提亮/暗角 + 胶片颗粒（细节质感） */
 @Composable
 private fun ColorBackground(color: Long, modifier: Modifier = Modifier) {
-    val grainBrush = remember {
-        ShaderBrush(ImageShader(createNoiseBitmap(), TileMode.Repeated, TileMode.Repeated))
-    }
     Box(
         modifier = modifier
             .fillMaxSize()
             .drawBehind {
                 drawRect(color = Color(color))
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.03f),
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.30f)
-                        ),
-                        center = Offset(size.width * 0.5f, size.height * 0.42f),
-                        radius = size.maxDimension * 0.90f
-                    )
-                )
-                drawRect(
-                    brush = grainBrush,
-                    alpha = 0.045f,
-                    blendMode = androidx.compose.ui.graphics.BlendMode.Overlay
-                )
             }
+    )
+}
+
+/** iOS 纯色背景：无颗粒噪点、无暗角，纯净 #F2F2F7 */
+@Composable
+private fun FlatBackground(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(IOSPalette.groupedBackground)
     )
 }
 
