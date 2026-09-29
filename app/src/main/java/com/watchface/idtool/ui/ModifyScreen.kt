@@ -760,7 +760,7 @@ private fun IdValidationHint(id: String, valid: Boolean) {
                         AppLocale.tf("有效的 {0} 位 ID", id.length),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color.White
+                        color = IOSPalette.success
                     )
                 }
                 else -> {
@@ -804,7 +804,7 @@ internal fun IconBadge(
     size: androidx.compose.ui.unit.Dp = 36.dp,
     iconSize: androidx.compose.ui.unit.Dp = 18.dp
 ) {
-    // 图标无彩色规格：仅保留极淡柔光，容器与图标统一中性（圆形容器，避免图标后方出现方形底）
+    // 图标使用传入的语义 tint（iOS 设置风格：彩色图标 + 极淡柔光玻璃底）
     Box(
         modifier = Modifier
             .size(size)
@@ -824,7 +824,7 @@ internal fun IconBadge(
         Icon(
             icon,
             contentDescription = null,
-            tint = IOSPalette.secondaryLabel,
+            tint = tint,
             modifier = Modifier.size(iconSize)
         )
     }

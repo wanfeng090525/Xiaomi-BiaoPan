@@ -132,15 +132,9 @@ import kotlinx.coroutines.withContext
 /** 全局语义色（iOS 语义色板） */
 object AppColors {
     val success = IOSPalette.success
-    val successDark = success
     val warning = IOSPalette.warning
     val danger = IOSPalette.destructive
-    val dangerDark = danger
     val info = IOSPalette.tint
-    val infoDark = info
-
-    /** 弱化语义色：浅色背景上的次级提示（原本是深色主题的浅灰，浅色下不可读） */
-    val muted = IOSPalette.secondaryLabel
 
     @Composable
     fun successAdaptive(): Color = success
@@ -150,9 +144,6 @@ object AppColors {
 
     @Composable
     fun infoAdaptive(): Color = info
-
-    @Composable
-    fun mutedAdaptive(): Color = muted
 }
 
 // ====================================================================
@@ -1458,167 +1449,6 @@ fun GlassNavBar(
 //   · 纯图标无文字（46dp 触控友好）
 //   · 激活时高亮白玻璃底 + 实心深色图标（与导航选中态同规格）
 // ====================================================================
-// 悬浮 Dock 栏（参考酷安样式）
-//
-//   · 白色圆角浮岛，带投影
-//   · 垂直布局：图标在上、文字在下
-//   · 选中项：白色圆形气泡滑动 + 绿色图标文字
-//   · 中间：绿色胶囊 + 主操作按钮
-// ====================================================================
-
-data class DockTab(val icon: ImageVector, val label: String)
-
-@Composable
-fun DockBar(
-    tabs: List<DockTab>,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-    centerIcon: ImageVector,
-    centerContentDescription: String,
-    onCenterClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val density = LocalDensity.current
-    val safeIndex = if (selected in tabs.indices) selected else -1
-    val bubbleSize = 46.dp
-    val activeGreen = Color(0xFF07C160)
-    val inactiveGray = Color(0xFF8E8E93)
-
-    val tabCenters = remember { mutableStateListOf<Float>().apply { repeat(tabs.size) { add(0f) } } }
-
-    val bubbleAnim = remember { Animatable(0f) }
-    LaunchedEffect(safeIndex, tabCenters.toList()) {
-        if (safeIndex >= 0 && tabCenters[safeIndex] > 0f) {
-            bubbleAnim.animateTo(
-                tabCenters[safeIndex],
-                spring(dampingRatio = 0.65f, stiffness = 420f)
-            )
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(64.dp)
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(32.dp),
-                spotColor = Color.Black.copy(alpha = 0.2f),
-                ambientColor = Color.Black.copy(alpha = 0.1f)
-            )
-            .clip(RoundedCornerShape(32.dp))
-            .background(Color.White)
-    ) {
-        if (safeIndex >= 0) {
-            Box(
-                modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            x = (bubbleAnim.value - with(density) { (bubbleSize / 2).toPx() }).roundToInt(),
-                            y = 0
-                        )
-                    }
-                    .size(bubbleSize)
-                    .align(Alignment.CenterStart)
-                    .shadow(2.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.08f))
-                    .clip(CircleShape)
-                    .background(Color(0xFFF2F3F5))
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            tabs.take(2).forEachIndexed { index, tab ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .onGloballyPositioned { coords ->
-                            val cx = coords.positionInParent().x + coords.size.width / 2f
-                            if (tabCenters[index] != cx) tabCenters[index] = cx
-                        }
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { onSelect(index) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    DockTabColumn(tab = tab, selected = index == safeIndex, activeGreen = activeGreen, inactiveGray = inactiveGray)
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .size(width = 54.dp, height = 40.dp)
-                    .shadow(3.dp, RoundedCornerShape(20.dp), spotColor = activeGreen.copy(alpha = 0.4f))
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(activeGreen)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onCenterClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    centerIcon,
-                    contentDescription = centerContentDescription,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-
-            tabs.drop(2).forEachIndexed { offset, tab ->
-                val index = offset + 2
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .onGloballyPositioned { coords ->
-                            val cx = coords.positionInParent().x + coords.size.width / 2f
-                            if (tabCenters[index] != cx) tabCenters[index] = cx
-                        }
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { onSelect(index) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    DockTabColumn(tab = tab, selected = index == safeIndex, activeGreen = activeGreen, inactiveGray = inactiveGray)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DockTabColumn(tab: DockTab, selected: Boolean, activeGreen: Color, inactiveGray: Color) {
-    val color by animateColorAsState(
-        targetValue = if (selected) activeGreen else inactiveGray,
-        animationSpec = tween(200),
-        label = "dockTabColor"
-    )
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            tab.icon,
-            contentDescription = tab.label,
-            tint = color,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = tab.label,
-            fontSize = 10.sp,
-            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-            color = color,
-            maxLines = 1
-        )
-    }
-}
-
 // 交错入场动画
 // ====================================================================
 

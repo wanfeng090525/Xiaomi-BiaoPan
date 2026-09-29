@@ -25,7 +25,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -78,9 +77,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.ui.text.TextStyle
@@ -414,63 +411,6 @@ fun WelcomeScreen(
     }
 }
 
-/** 应用徽标：玻璃相框 + 弹簧入场 */
-@Composable
-private fun LogoBadge(size: androidx.compose.ui.unit.Dp = 44.dp) {
-    var shown by remember { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { shown = true }
-    val scale by animateFloatAsState(
-        targetValue = if (shown) 1f else 0.3f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = 420f),
-        label = "logoScale"
-    )
-    Box(
-        modifier = Modifier
-            .size(size)
-            .glassShadow(6.dp, RoundedCornerShape(size * 0.32f))
-            .liquidGlass(
-                shape = RoundedCornerShape(size * 0.32f),
-                blurRadius = 6.dp,
-                lensHeight = 12.dp,
-                lensAmount = 20.dp,
-                // 入场缩放走 layerBlock：背景折射不跟手缩放
-                layerBlock = {
-                    scaleX = scale
-                    scaleY = scale
-                }
-            )
-            .glass(
-                RoundedCornerShape(size * 0.32f),
-                rememberGlassColors()
-            )
-            .padding(4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(size * 0.26f))
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.16f),
-                            Color.White.copy(alpha = 0.05f)
-                        )
-                    ),
-                    RoundedCornerShape(size * 0.26f)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = com.watchface.idtool.R.drawable.ic_ximi_logo),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
-}
-
 // ====================================================================
 // 快捷操作瓷砖（参考图圆形开关的方形版：图标 + 标题 + 副标题）
 // ====================================================================
@@ -524,7 +464,7 @@ private fun QuickTile(
             Icon(
                 icon,
                 contentDescription = null,
-                tint = if (tint.alpha < 0.9f) tint else Color(0xFF555555),
+                tint = tint,
                 modifier = Modifier.size(26.dp)
             )
             Column {
@@ -688,8 +628,8 @@ private fun HitokotoBar() {
                     Brush.horizontalGradient(
                         listOf(
                             Color.Transparent,
-                            Color.White.copy(alpha = 0.16f),
-                            Color.White.copy(alpha = 0.16f),
+                            IOSPalette.separator.copy(alpha = 0.9f),
+                            IOSPalette.separator.copy(alpha = 0.9f),
                             Color.Transparent
                         )
                     ),
@@ -709,9 +649,9 @@ private fun HitokotoBar() {
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color.White.copy(alpha = 0.0f),
-                                Color.White.copy(alpha = 0.55f),
-                                Color.White.copy(alpha = 0.0f)
+                                IOSPalette.tint.copy(alpha = 0.0f),
+                                IOSPalette.tint.copy(alpha = 0.65f),
+                                IOSPalette.tint.copy(alpha = 0.0f)
                             )
                         ),
                         RoundedCornerShape(2.dp)
@@ -1369,8 +1309,8 @@ internal fun DownloadProgressDialog(
                                     .fillMaxWidth()
                                     .height(9.dp)
                                     .clip(RoundedCornerShape(5.dp)),
-                                color = Color.White,
-                                trackColor = Color.White.copy(alpha = 0.12f),
+                                color = IOSPalette.tint,
+                                trackColor = IOSPalette.label.copy(alpha = 0.10f),
                             )
                             Spacer(Modifier.height(8.dp))
                             Row(
@@ -1388,7 +1328,7 @@ internal fun DownloadProgressDialog(
                                         text = "${formatBytes(speedBytesPerSec)}/s",
                                         fontSize = 11.sp,
                                         fontFamily = NumericFonts,
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -1396,7 +1336,7 @@ internal fun DownloadProgressDialog(
                                     text = if (totalBytes > 0) "$progress%" else formatBytes(downloadedBytes),
                                     fontSize = 11.sp,
                                     fontFamily = NumericFonts,
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
@@ -1529,7 +1469,7 @@ private fun KeyExtractionTile(
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = IOSPalette.tint,
                         modifier = Modifier
                             .size(18.dp)
                             .graphicsLayer { rotationZ = rotation }
@@ -1538,7 +1478,7 @@ private fun KeyExtractionTile(
                     Icon(
                         Icons.Default.Shield,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = IOSPalette.tint,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -1672,7 +1612,7 @@ private fun KeyExtractionResultCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(0.5.dp)
-                    .background(Color.White.copy(alpha = 0.08f))
+                    .background(IOSPalette.separator.copy(alpha = 0.6f))
             )
             Spacer(Modifier.height(12.dp))
 
@@ -1827,7 +1767,7 @@ private fun KeyRow(
                     text = "设备：$subtitle",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF7CFBA7),
+                    color = AppColors.success,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1855,7 +1795,7 @@ private fun KeyRow(
         Icon(
             imageVector = if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
             contentDescription = if (isCopied) "已复制" else "复制",
-            tint = if (isCopied) Color(0xFF7CFBA7) else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (isCopied) AppColors.success else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(14.dp)
         )
     }

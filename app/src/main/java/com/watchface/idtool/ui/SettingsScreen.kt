@@ -278,7 +278,7 @@ fun SettingsScreen(
                         Icon(
                             painter = painterResource(id = com.watchface.idtool.R.drawable.ic_github),
                             contentDescription = "Github 仓库",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(38.dp)
                         )
                         Spacer(Modifier.height(10.dp))
@@ -358,7 +358,7 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    GlowDot(color = Color.White, dotSize = 10.dp)
+                    GlowDot(color = IOSPalette.tint, dotSize = 10.dp)
                     Spacer(Modifier.height(14.dp))
                     Text(
                         text = "正在检查更新…",
@@ -567,7 +567,7 @@ private fun LoginStatusSection() {
                     )
                     if (loggedIn) {
                         Spacer(Modifier.width(8.dp))
-                        GlowDot(color = Color.White, dotSize = 7.dp)
+                        GlowDot(color = IOSPalette.success, dotSize = 7.dp)
                     }
                 }
                 Spacer(Modifier.height(3.dp))
@@ -734,7 +734,7 @@ private fun PermissionSection(
                         status == PermissionStatus.FILE
                     ) {
                         Spacer(Modifier.width(8.dp))
-                        GlowDot(color = Color.White, dotSize = 7.dp)
+                        GlowDot(color = IOSPalette.success, dotSize = 7.dp)
                     }
                 }
                 Spacer(Modifier.height(3.dp))
@@ -889,7 +889,7 @@ private fun LanguageDialog(
                                         text = locale.native,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color = if (selected) Color.White
+                                        color = if (selected) IOSPalette.tint
                                         else MaterialTheme.colorScheme.onSurface
                                     )
                                     if (locale.zhDesc != locale.native) {
@@ -905,7 +905,7 @@ private fun LanguageDialog(
                                     Icon(
                                         Icons.Default.Check,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = IOSPalette.tint,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -974,7 +974,7 @@ private fun BgStyleDialog(
                                     text = opt.title,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = if (selected) Color.White
+                                    color = if (selected) IOSPalette.tint
                                     else MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(Modifier.height(2.dp))
@@ -988,7 +988,7 @@ private fun BgStyleDialog(
                                 Icon(
                                     Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = IOSPalette.tint,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -1055,7 +1055,7 @@ private fun ColorPickerDialog(
                         .height(64.dp)
                         .border(
                             width = 1.dp,
-                            color = Color.White.copy(alpha = 0.25f),
+                            color = IOSPalette.separator,
                             shape = RoundedCornerShape(16.dp)
                         )
                         .background(
@@ -1105,11 +1105,11 @@ private fun ColorPickerDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                // HSV 拉条（白色系规格与密度拉条一致）
+                // HSV 拉条（iOS 蓝色规格，浅色弹窗下清晰可辨）
                 val sliderColors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Color.White.copy(alpha = 0.9f),
-                    inactiveTrackColor = Color.White.copy(alpha = 0.16f)
+                    thumbColor = IOSPalette.tint,
+                    activeTrackColor = IOSPalette.tint.copy(alpha = 0.75f),
+                    inactiveTrackColor = IOSPalette.separator
                 )
                 Text(AppLocale.tf("色调  {0}°", hue.roundToInt()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Slider(
