@@ -311,9 +311,9 @@ private fun AppContent() {
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    // 比例参考头条 dock：左右各 48dp → 居中占 ~74% 屏宽
-                    // 底部 28dp → 浮岛与系统导航条之间的视觉距离
-                    .padding(start = 48.dp, end = 48.dp, bottom = 28.dp)
+                    // 左右各 60dp → dock 居中占 ~67% 屏宽（不撑满，酷安头条比例）
+                    // 底部 24dp → 与系统导航条之间留出浮岛感
+                    .padding(start = 60.dp, end = 60.dp, bottom = 24.dp)
             )
 
             if (isRestoring || state.isLoading) {

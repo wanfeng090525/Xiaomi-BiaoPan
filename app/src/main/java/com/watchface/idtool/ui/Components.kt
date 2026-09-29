@@ -2000,10 +2000,10 @@ fun GlassNavBar(
 
     val brandGreen = Color(0xFF34C759)
     val idleInk = Color(0xFF16181C)
-    // 比例参考酷安头条 App：容器宽 ~74% 屏宽（不撑满）、圆角 38dp、内容高 56dp
-    val chipSize = 56.dp
-    val dockShape = RoundedCornerShape(38.dp)
-    val chipShape = RoundedCornerShape(24.dp)
+    // 比例参考酷安头条 App：紧凑居中，圆角 32dp，内容高 50dp
+    val chipSize = 50.dp
+    val dockShape = RoundedCornerShape(32.dp)
+    val chipShape = RoundedCornerShape(22.dp)
 
     // 各 Tab 位置（onGloballyPositioned 采集；坐标基于内容区，指示块同处内容区故直接对齐）
     var tabMetrics by remember { mutableStateOf(List<TabMetrics?>(tabs.size) { null }) }
@@ -2095,79 +2095,75 @@ fun GlassNavBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            // 防御性最大高度：正常渲染下实际高度 = chipSize + 16dp ≈ 72dp（头条 dock 比例），
+            // 防御性最大高度：正常渲染下实际高度 = chipSize + 14dp ≈ 64dp，
             // 此限制只在 backdrop 异常回流时兜底，避免撑大屏幕
-            .heightIn(max = 84.dp)
-            // 整个 Dock 浮岛跟手平移：拖动起点 tab 中心 → 当前手指位置，
-            // 视觉上像把整列物理浮岛拉过去；松手后 spring 回弹 + 切页
+            .heightIn(max = 76.dp)
+            // 整个 Dock 浮岛跟手平移（不是指示块跟手，酷安头条 dock 效果）
             .graphicsLayer { translationX = dockOffsetX }
             .shadow(
-                elevation = 10.dp,
+                elevation = 8.dp,
                 shape = dockShape,
                 clip = false,
-                spotColor = Color.Black.copy(alpha = 0.32f),
-                ambientColor = Color.Black.copy(alpha = 0.16f)
+                spotColor = Color.Black.copy(alpha = 0.28f),
+                ambientColor = Color.Black.copy(alpha = 0.12f)
             )
-            // 完全透明的液体玻璃：只做真实背景模糊 + 折射，不画任何固定底色。
-            // 颜色完全由 AppBackground 经 backdrop 透出——
-            // 深蓝紫背景 → Dock 显深蓝紫，浅蓝紫背景 → Dock 显浅蓝紫。
-            // 这就是酷安头条 App 那种"dock 颜色随背景变"的细节。
+            // 真实液体玻璃：液体模糊 + 折射（库自带 lens 高光 + 色散 + 厚度折射）
             .liquidGlass(
                 shape = dockShape,
-                blurRadius = 28.dp,
-                lensHeight = 12.dp,
-                lensAmount = 16.dp
+                blurRadius = 24.dp,
+                lensHeight = 10.dp,
+                lensAmount = 14.dp
             )
-            // 1.5dp 亮边：透明 Dock 在任何背景下都需要一条清晰轮廓
-            .drawBehind {
-                val outline = dockShape.createOutline(size, layoutDirection, this)
-                drawOutline(
-                    outline = outline,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.60f),
-                            Color.White.copy(alpha = 0.10f)
-                        ),
-                        start = Offset(0f, 0f),
-                        end = Offset(size.width, size.height)
-                    ),
-                    style = Stroke(width = 1.5.dp.toPx())
+            // 用 .glass() 画液态玻璃标志细节（顶部高光 + 菲涅尔描边），
+            // tintTop/tintBottom 透明 → 保留库折射 + 顶部光泽 + 描边，不染白底
+            .glass(
+                dockShape,
+                GlassColors(
+                    tintTop = Color.Transparent,
+                    tintBottom = Color.Transparent,
+                    highlight = Color.White.copy(alpha = 0.42f),
+                    rimBright = Color.White.copy(alpha = 0.60f),
+                    rimDim = Color.Black.copy(alpha = 0.06f)
                 )
-            }
-            .padding(horizontal = 6.dp, vertical = 8.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 7.dp)
     ) {
         // 选中态：圆角矩形浅色块，垫底绘制（颜色是白底上的低透明黑 = 均匀浅灰）
         if (activeIndex in tabs.indices) {
-            val (indLeft, indWidth) = indicatorRect(slotValue)
-            // 离目标越远越拉伸，横跨两个 Tab
-            val travel = abs(slotValue - activeIndex.toFloat())
-            val stretch = with(density) { (travel * 60.dp.toPx()).coerceAtMost(56.dp.toPx()) }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .offset { IntOffset((indLeft - stretch / 2f).roundToInt(), 0) }
-                    .width(with(density) { (indWidth + stretch).toDp() })
-                    .height(chipSize)
-                    .clip(chipShape)
-                    // 选中块底色：白底上叠 6% 黑 = 比 Dock 略亮一点的浅灰
-                    .background(idleInk.copy(alpha = 0.06f))
-                    // 1dp 渐变描边：让选中块在浅色 Dock 上一眼能识别（参考头条 App 细节）
-                    .drawBehind {
-                        val outline = chipShape.createOutline(size, layoutDirection, this)
-                        drawOutline(
-                            outline = outline,
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.65f),
-                                    Color.White.copy(alpha = 0.15f)
-                                ),
-                                start = Offset(0f, 0f),
-                                end = Offset(size.width, size.height)
+            // 指示块固定在 activeIndex 对应的 tab 中心（不跟手指滑动），
+            // 整个 Dock 浮岛跟手平移（graphicsLayer translationX）——二者各管一层，
+            // 避免之前指示块和 dock 同时滑动造成的视觉错位
+            val m = tabMetrics[activeIndex]
+            if (m != null) {
+                val indWidthPx = with(density) { chipSize.toPx() }
+                val indLeftPx = m.left + m.width / 2f - indWidthPx / 2f
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset { IntOffset(indLeftPx.roundToInt(), 0) }
+                        .width(chipSize)
+                        .height(chipSize)
+                        .clip(chipShape)
+                        // 选中块底色：白底上叠 6% 黑 = 比 Dock 略亮一点的浅灰
+                        .background(idleInk.copy(alpha = 0.06f))
+                        // 1dp 渐变描边：让选中块在浅色 Dock 上一眼能识别
+                        .drawBehind {
+                            val outline = chipShape.createOutline(size, layoutDirection, this)
+                            drawOutline(
+                                outline = outline,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.65f),
+                                        Color.White.copy(alpha = 0.15f)
+                                    ),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(size.width, size.height)
                             ),
                             style = Stroke(width = 1.dp.toPx())
                         )
-                    }
-            )
+                        }
+                )
+            }
         }
 
         Row(
