@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -2295,8 +2296,8 @@ private fun RowScope.DockTabItem(
         animationSpec = spring(dampingRatio = 0.55f, stiffness = 680f),
         label = "dockNavIcon$index"
     )
-    val labelSize by animateDpAsState(
-        targetValue = if (isSelected) 12.sp else 11.sp,
+    val labelSize by animateFloatAsState(
+        targetValue = if (isSelected) 12f else 11f,
         animationSpec = spring(dampingRatio = 0.55f, stiffness = 680f),
         label = "dockNavLabel$index"
     )
@@ -2324,7 +2325,7 @@ private fun RowScope.DockTabItem(
             Spacer(Modifier.height(3.dp))
             Text(
                 text = tab.label,
-                fontSize = labelSize,
+                fontSize = labelSize.sp,
                 fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
                 color = color,
                 maxLines = 1
