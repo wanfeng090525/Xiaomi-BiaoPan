@@ -1792,7 +1792,9 @@ fun GlassNavBar(
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    onSettingsClick: (() -> Unit)? = null
+    onSettingsClick: (() -> Unit)? = null,
+    /** 当前是否停留在设置页：为 true 时右侧齿轮呈选中态（蓝色 + 半透明灰光效） */
+    settingsSelected: Boolean = false
 ) {
     val safeIndex = if (selected in tabs.indices) selected else -1
     val density = LocalDensity.current
@@ -2079,6 +2081,13 @@ fun GlassNavBar(
                 animationSpec = tween(90),
                 label = "settingsFabAlpha"
             )
+            // 选中态：底色叠加与 Tab 指示胶囊同款的半透明灰光效（单一色源，调 alpha 自动跟随）
+            // 齿轮随选中变蓝，动画节奏与 Tab 图标一致
+            val gearTint by animateColorAsState(
+                targetValue = if (settingsSelected) IOSPalette.tint else IOSPalette.label,
+                animationSpec = tween(180),
+                label = "gearTint"
+            )
             Box(
                 modifier = Modifier
                     .size(52.dp)
@@ -2092,6 +2101,10 @@ fun GlassNavBar(
                     .graphicsLayer { alpha = fabAlpha }
                     .clip(CircleShape)
                     .background(IOSPalette.card)
+                    .then(
+                        if (settingsSelected) Modifier.background(IOSPalette.capsuleSelected)
+                        else Modifier
+                    )
                     .clickable(
                         interactionSource = settingsInteraction,
                         indication = null
@@ -2101,7 +2114,7 @@ fun GlassNavBar(
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = "设置",
-                    tint = IOSPalette.label,
+                    tint = gearTint,
                     modifier = Modifier
                         .size(24.dp)
                         .graphicsLayer {

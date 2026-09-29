@@ -298,6 +298,8 @@ private fun AppContent() {
                     )
                 },
                 onSettingsClick = { switchPage("settings") },
+                // 停留在设置页时：齿轮蓝色高亮 + 圆形按钮半透明灰光效
+                settingsSelected = currentPage == "settings",
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
