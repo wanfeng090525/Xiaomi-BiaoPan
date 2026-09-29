@@ -2085,44 +2085,35 @@ fun GlassNavBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            // 防御性最大高度：放弃 backdrop 真折射后此限制只是兜底，
-            // 正常渲染下实际高度 = chipSize + 14dp ≈ 66dp
+            // 防御性最大高度：正常渲染下实际高度 = chipSize + 14dp ≈ 66dp，
+            // 此限制只在 backdrop 异常回流时兜底，避免撑大屏幕
             .heightIn(max = 76.dp)
             .shadow(
-                elevation = 10.dp,
+                elevation = 8.dp,
                 shape = dockShape,
                 clip = false,
-                spotColor = Color.Black.copy(alpha = 0.28f),
-                ambientColor = Color.Black.copy(alpha = 0.14f)
+                spotColor = Color.Black.copy(alpha = 0.26f),
+                ambientColor = Color.Black.copy(alpha = 0.12f)
             )
-            .clip(dockShape)
-            // 浅色磨砂主体：白色上下渐变（顶部稍亮模拟厚玻璃）。
-            // 放弃 liquidGlass/backdrop 折射，避免它与项目其它液态玻璃互相影响时
-            // 把 dock 的渲染层撑大。
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.84f),
-                        Color.White.copy(alpha = 0.72f)
-                    )
+            // 浅色磨砂：真实背景模糊 + 折射（用项目里的 AndroidLiquidGlass 库，
+            // 即酷安 dock 同款 Kyant 0/backdrop）
+            .liquidGlass(
+                shape = dockShape,
+                blurRadius = 16.dp,
+                lensHeight = 8.dp,
+                lensAmount = 12.dp
+            )
+            // 浅色玻璃材质：白渐变底（顶亮底暗） + 微弱黑色压边，避免浅底泛光发糊
+            .glass(
+                dockShape,
+                GlassColors(
+                    tintTop = Color.White.copy(alpha = 0.86f),
+                    tintBottom = Color.White.copy(alpha = 0.72f),
+                    highlight = Color.White.copy(alpha = 0.80f),
+                    rimBright = Color.White.copy(alpha = 0.95f),
+                    rimDim = Color.Black.copy(alpha = 0.06f)
                 )
             )
-            // 亮边描线：浅色 Dock 压在深色 App 上需要一条清晰轮廓
-            .drawBehind {
-                val outline = dockShape.createOutline(size, layoutDirection, this)
-                drawOutline(
-                    outline = outline,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.65f),
-                            Color.White.copy(alpha = 0.12f)
-                        ),
-                        start = Offset(0f, 0f),
-                        end = Offset(size.width, size.height)
-                    ),
-                    style = Stroke(width = 1.2.dp.toPx())
-                )
-            }
             .padding(horizontal = 6.dp, vertical = 7.dp)
     ) {
         // 选中态：圆角矩形浅色块，垫底绘制（颜色是白底上的低透明黑 = 均匀浅灰）

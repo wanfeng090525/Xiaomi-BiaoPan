@@ -8,11 +8,9 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -31,7 +29,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -53,7 +50,6 @@ import kotlin.math.roundToInt
 import com.watchface.idtool.ui.AppBackground
 import com.watchface.idtool.ui.GlassNavTab
 import com.watchface.idtool.ui.GlassNavBar
-import com.watchface.idtool.ui.GlassNavCenter
 import com.watchface.idtool.ui.GlobalRippleOverlay
 import com.watchface.idtool.ui.HistoryScreen
 import com.watchface.idtool.ui.LoadingOverlay
@@ -65,7 +61,6 @@ import com.watchface.idtool.ui.SnowfallLayer
 import com.watchface.idtool.ui.ToastMessage
 import com.watchface.idtool.ui.WatchFaceTheme
 import com.watchface.idtool.ui.WelcomeScreen
-import com.watchface.idtool.ui.rememberWatchfacePicker
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 class MainActivity : ComponentActivity() {
@@ -222,14 +217,6 @@ private fun AppContent() {
         currentPage = page
     }
 
-    // Dock 中心「+」：选一个表盘文件 → 加载后直接进修改页
-    val launchDockFilePicker = rememberWatchfacePicker { uri, fileName ->
-        if (viewModel.requireLogin()) {
-            viewModel.loadFile(uri, fileName)
-            currentPage = "modify"
-        }
-    }
-
     // AndroidLiquidGlass：全局背景折射层。AppBackground 将自身绘制内容
     // 注册到该层，所有 .liquidGlass() 玻璃组件据此做真实折射/模糊
     val appBackdrop = rememberLayerBackdrop()
@@ -297,7 +284,7 @@ private fun AppContent() {
                 }
             }
 
-            // L2 悬浮玻璃导航栏（浅色磨砂 Dock：图标在上文字在下，中间绿色主操作按钮）
+            // L2 悬浮玻璃导航栏（浅色磨砂 Dock：图标在上文字在下，4 个界面）
             GlassNavBar(
                 tabs = listOf(
                     GlassNavTab(Icons.Default.Home, "主页"),
@@ -322,11 +309,6 @@ private fun AppContent() {
                         }
                     )
                 },
-                center = GlassNavCenter(
-                    icon = Icons.Default.Add,
-                    contentDescription = "添加表盘",
-                    onClick = { launchDockFilePicker() }
-                ),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
