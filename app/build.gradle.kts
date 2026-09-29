@@ -41,8 +41,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // R8 开关：CI 手动触发时可传 -Pr8=false 关闭混淆压缩以提速，
+            // 默认（本地或未传参）保持开启。
+            val r8Enabled = (project.findProperty("r8") as? String)
+                ?.toBooleanStrictOrNull() ?: true
+            isMinifyEnabled = r8Enabled
+            // shrinkResources 依赖 minify，必须同步开关
+            isShrinkResources = r8Enabled
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
