@@ -167,7 +167,7 @@ fun SettingsScreen(
             InsetGroup {
                 SettingsRow(
                     icon = Icons.Default.Language,
-                    iconTint = MaterialTheme.colorScheme.primary,
+                    iconTint = IOSPalette.tileBlue,
                     title = "语言",
                     subtitle = langNative,
                     onClick = { showLangDialog = true }
@@ -189,7 +189,7 @@ fun SettingsScreen(
             InsetGroup {
                 SettingsRow(
                     icon = Icons.Default.Wallpaper,
-                    iconTint = MaterialTheme.colorScheme.primary,
+                    iconTint = IOSPalette.tilePurple,
                     title = "背景样式",
                     subtitle = when (bgCfg.mode) {
                         BgMode.GALLERY -> "自定义图片"
@@ -203,7 +203,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsRow(
                         icon = Icons.Default.Palette,
-                        iconTint = MaterialTheme.colorScheme.secondary,
+                        iconTint = IOSPalette.tileIndigo,
                         title = "背景颜色",
                         subtitle = "自定义纯色（保持界面可读的深色调）",
                         onClick = { showColorDialog = true }
@@ -221,7 +221,7 @@ fun SettingsScreen(
             InsetGroup {
                 SettingsRow(
                     icon = Icons.Default.CloudDownload,
-                    iconTint = AppColors.successAdaptive(),
+                    iconTint = IOSPalette.tileTeal,
                     title = "检查更新",
                     subtitle = AppLocale.tf("当前版本 v{0}", BuildConfig.VERSION_NAME),
                     onClick = { viewModel.checkCloudConfig("update") }
@@ -229,7 +229,7 @@ fun SettingsScreen(
                 SettingsDivider()
                 SettingsRow(
                     icon = Icons.Default.Info,
-                    iconTint = MaterialTheme.colorScheme.secondary,
+                    iconTint = IOSPalette.tileOrange,
                     title = "查看公告",
                     subtitle = if (state.cloudConfig != null) "有新公告" else "暂无公告",
                     onClick = { viewModel.checkCloudConfig("announce") }
@@ -462,7 +462,7 @@ private fun SectionLabel(text: String) {
 
 /** iOS 彩色圆角瓦片图标容器 */
 @Composable
-private fun IconBadge(icon: ImageVector, tint: Color, size: androidx.compose.ui.unit.Dp = 29.dp) {
+private fun IconBadge(icon: ImageVector, tint: Color, size: androidx.compose.ui.unit.Dp = 28.dp) {
     Box(
         modifier = Modifier
             .size(size)
@@ -812,7 +812,7 @@ private fun DensitySliderRow() {
             .padding(horizontal = 13.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconBadge(Icons.Default.AspectRatio, MaterialTheme.colorScheme.secondary)
+        IconBadge(Icons.Default.AspectRatio, IOSPalette.tileBlue)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(
@@ -821,25 +821,25 @@ private fun DensitySliderRow() {
             ) {
                 Text(
                     text = "显示密度",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = IOSPalette.label
                 )
                 Spacer(Modifier.weight(1f))
                 // 实时百分比（保时捷工程数字）
                 Text(
                     text = "${(sliderValue * 100).roundToInt()}%",
-                    fontSize = 14.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = NumericFonts,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = IOSPalette.secondaryLabel
                 )
             }
             Spacer(Modifier.height(2.dp))
             Text(
                 text = "80% ~ 110%，松手后界面重新加载",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontSize = 13.sp,
+                color = IOSPalette.secondaryLabel
             )
             Spacer(Modifier.height(4.dp))
             GlassSlider(

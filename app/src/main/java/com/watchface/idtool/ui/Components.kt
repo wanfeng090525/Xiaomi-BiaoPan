@@ -574,7 +574,7 @@ fun GlassSlider(
                 .offset { IntOffset(0, trackTop.roundToInt()) }
                 .drawBehind {
                     drawRoundRect(
-                        color = Color.White.copy(alpha = 0.14f),
+                        color = IOSPalette.separator,
                         topLeft = Offset.Zero,
                         size = Size(size.width, trackH),
                         cornerRadius = CornerRadius(trackH / 2f, trackH / 2f)
@@ -593,8 +593,8 @@ fun GlassSlider(
                     drawRoundRect(
                         brush = Brush.horizontalGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.88f),
-                                Color.White.copy(alpha = 0.55f)
+                                IOSPalette.tint,
+                                IOSPalette.tint
                             )
                         ),
                         topLeft = Offset.Zero,
@@ -609,27 +609,26 @@ fun GlassSlider(
             modifier = Modifier
                 .size(24.dp)
                 .offset { IntOffset(thumbX.roundToInt(), thumbTop.roundToInt()) }
-                .liquidGlass(
+                // 纯白实心滑块 + 细描边（iOS Slider），拖动时轻微放大
+                .graphicsLayer {
+                    scaleX = thumbScale
+                    scaleY = thumbScale
+                }
+                .shadow(
+                    elevation = 2.dp,
                     shape = CircleShape,
-                    blurRadius = 3.dp,
-                    lensHeight = 5.dp,
-                    lensAmount = 8.dp,
-                    // 拖动放大走 layerBlock：背景折射不跟手缩放
-                    layerBlock = {
-                        scaleX = thumbScale
-                        scaleY = thumbScale
-                    }
+                    clip = false,
+                    spotColor = Color.Black.copy(alpha = 0.16f),
+                    ambientColor = Color.Black.copy(alpha = 0.08f)
                 )
-                .glow(
-                    Color.White.copy(alpha = if (dragging) 0.34f else 0.20f),
-                    radiusFraction = 1.7f
-                )
-                .glass(CircleShape, rememberGlassColors())
+                .clip(CircleShape)
+                .background(IOSPalette.card)
                 .drawBehind {
                     drawCircle(
-                        color = Color.White.copy(alpha = 0.92f),
-                        radius = size.minDimension * 0.32f,
-                        center = this.center
+                        color = Color.Black.copy(alpha = 0.10f),
+                        radius = size.minDimension * 0.5f,
+                        center = this.center,
+                        style = Stroke(width = 1.dp.toPx())
                     )
                 }
         )
@@ -1598,7 +1597,7 @@ fun GlassCard(
     @Suppress("UNUSED_PARAMETER") tintTop: Color? = null,
     @Suppress("UNUSED_PARAMETER") tintBottom: Color? = null,
     contentPadding: Dp = 16.dp,
-    shadowElevation: Dp = 0.dp,
+    shadowElevation: Dp = 4.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val clickInteraction = remember(onClick != null) { MutableInteractionSource() }
@@ -1620,7 +1619,14 @@ fun GlassCard(
         modifier = modifier
             .then(
                 if (shadowElevation > 0.dp) {
-                    Modifier.shadow(shadowElevation, shape, clip = false)
+                    // 弥散投影：低 elevation + 低透明度黑 = iOS 卡片阴影质感
+                    Modifier.shadow(
+                        elevation = shadowElevation,
+                        shape = shape,
+                        clip = false,
+                        spotColor = Color.Black.copy(alpha = 0.06f),
+                        ambientColor = Color.Black.copy(alpha = 0.03f)
+                    )
                 } else Modifier
             )
             .then(base)
@@ -1655,73 +1661,56 @@ fun GlassButton(
     shimmer: Boolean = true
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(50)
-    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    val shape = RoundedCornerShape(14.dp)
     val pressed by interaction.collectIsPressedAsState()
-    val pressScaleAnim by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
-        label = "buttonPressScale"
+    // iOS Active state：按下时轻微变淡（替代深色玻璃的折射缩放）
+    val pressAlpha by animateFloatAsState(
+        targetValue = if (pressed) IOSPalette.pressedOpacity else 1f,
+        animationSpec = tween(90),
+        label = "buttonPressAlpha"
     )
 
+    // Primary  = 实心系统蓝底 + 白字（最高对比）
+    // Glass    = 纯白底 + 1px #E5E5EA 描边 + #333333 深灰字
+    // Danger   = 纯白底 + 1px #FF3B30 描边 + #FF3B30 红字
     val container = when (style) {
-        GlassButtonStyle.Primary -> {
-            // 提亮玻璃规格：半透明白玻璃底 + 亮边环 + 内容光晕（与整体液态玻璃同语言）
-            val glass = Modifier
-                .glassShadow(8.dp, shape)
-                .glow(Color.White.copy(alpha = 0.22f), radiusFraction = 1.6f)
-                .glass(
-                    shape,
-                    GlassColors(
-                        tintTop = Color.White.copy(alpha = 0.26f),
-                        tintBottom = Color.White.copy(alpha = 0.12f),
-                        highlight = Color.White.copy(alpha = 0.42f),
-                        rimBright = Color.White.copy(alpha = 0.80f),
-                        rimDim = Color.Black.copy(alpha = 0.12f)
-                    )
-                )
-            if (shimmer) glass.shimmerSweep(bandColor = Color(0xFFD9DEEB)) else glass
-        }
+        GlassButtonStyle.Primary -> Modifier
+            .shadow(
+                elevation = 1.dp, shape = shape, clip = false,
+                spotColor = Color.Black.copy(alpha = 0.12f),
+                ambientColor = Color.Transparent
+            )
+            .clip(shape)
+            .background(IOSPalette.tint)
 
         GlassButtonStyle.Glass -> Modifier
-            .glassShadow(4.dp, shape)
-            .glass(shape, rememberGlassColors())
+            .clip(shape)
+            .background(IOSPalette.card)
+            .drawBehind {
+                val outline = shape.createOutline(size, layoutDirection, this)
+                drawOutline(outline, color = IOSPalette.separator, style = Stroke(width = 1.dp.toPx()))
+            }
 
         GlassButtonStyle.Danger -> Modifier
-            .glassShadow(4.dp, shape)
-            .glass(shape, rememberGlassColors())
+            .clip(shape)
+            .background(IOSPalette.card)
+            .drawBehind {
+                val outline = shape.createOutline(size, layoutDirection, this)
+                drawOutline(outline, color = IOSPalette.destructive, style = Stroke(width = 1.dp.toPx()))
+            }
     }
 
     val contentColor = when (style) {
-        GlassButtonStyle.Primary -> Color(0xFFF3F5FA)
-        GlassButtonStyle.Glass -> Color(0xFFE9EBF4)
-        GlassButtonStyle.Danger -> Color(0xFFE9EBF4)
+        GlassButtonStyle.Primary -> Color.White
+        GlassButtonStyle.Glass -> Color(0xFF333333)
+        GlassButtonStyle.Danger -> IOSPalette.destructive
     }
 
     Box(
         modifier = modifier
             .height(height)
-            .liquidGlass(
-                shape = shape,
-                blurRadius = 6.dp,
-                lensHeight = 12.dp,
-                lensAmount = 20.dp,
-                layerBlock = {
-                    scaleX = pressScaleAnim
-                    scaleY = pressScaleAnim
-                }
-            )
+            .graphicsLayer { alpha = pressAlpha }
             .then(container)
-            .pressRipple(
-                interaction,
-                clipShape = shape,
-                color = when (style) {
-                    GlassButtonStyle.Primary -> Color.White
-                    GlassButtonStyle.Glass -> Color(0xFFD9DEEB)
-                    GlassButtonStyle.Danger -> Color(0xFFD9DEEB)
-                },
-                intensity = 1.15f
-            )
             .clickable(interactionSource = interaction, indication = null) {
                 onClick()
             },
@@ -1736,18 +1725,17 @@ fun GlassButton(
                     icon,
                     contentDescription = null,
                     tint = contentColor,
-                    modifier = Modifier.size(17.dp)
+                    modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(7.dp))
             }
             Text(
                 text = text,
                 color = contentColor,
-                fontSize = 14.5.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
-                letterSpacing = 0.3.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 10.dp)
+                modifier = Modifier.padding(horizontal = 12.dp)
             )
         }
     }
@@ -2586,8 +2574,9 @@ fun ResultDialog(
     Dialog(onDismissRequest = onDismiss) {
         DialogEntrance {
             GlassCard(
-                shape = RoundedCornerShape(28.dp),
-                contentPadding = 24.dp
+                shape = RoundedCornerShape(20.dp),
+                contentPadding = 22.dp,
+                shadowElevation = 12.dp
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -2607,18 +2596,13 @@ fun ResultDialog(
                             )
                         ) + fadeIn(tween(120))
                     ) {
-                        val iconColor = if (success) AppColors.successAdaptive() else AppColors.dangerAdaptive()
+                        val iconColor =
+                            if (success) IOSPalette.success else IOSPalette.destructive
                         Box(
                             modifier = Modifier
-                                .size(58.dp)
-                                .glow(iconColor, radiusFraction = 1.6f)
-                                .glass(
-                                    CircleShape,
-                                    rememberGlassColors(
-                                        tintTop = iconColor.copy(alpha = 0.24f),
-                                        tintBottom = iconColor.copy(alpha = 0.10f)
-                                    )
-                                ),
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(iconColor),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -2678,21 +2662,16 @@ fun ConfirmDialog(
     Dialog(onDismissRequest = onDismiss) {
         DialogEntrance {
             GlassCard(
-                shape = RoundedCornerShape(28.dp),
-                contentPadding = 24.dp
+                shape = RoundedCornerShape(20.dp),
+                contentPadding = 22.dp,
+                shadowElevation = 12.dp
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
-                            .size(58.dp)
-                            .glow(AppColors.warning, radiusFraction = 1.6f)
-                            .glass(
-                                CircleShape,
-                                rememberGlassColors(
-                                    tintTop = AppColors.warning.copy(alpha = 0.22f),
-                                    tintBottom = AppColors.warning.copy(alpha = 0.10f)
-                                )
-                            ),
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(IOSPalette.warning),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(

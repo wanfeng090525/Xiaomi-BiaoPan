@@ -103,7 +103,7 @@ object IOSPalette {
 
     // ---- 圆角 ----
     /** InsetGrouped 卡片圆角 */
-    val cardRadius = 10.dp
+    val cardRadius = 16.dp
     /** ListItem 高亮块圆角 */
     val rowRadius = 8.dp
     /** 彩色图标瓦片圆角 */

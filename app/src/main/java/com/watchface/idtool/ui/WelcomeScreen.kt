@@ -100,6 +100,8 @@ import com.watchface.idtool.MainViewModel
 import com.watchface.idtool.PermissionStatus
 import com.watchface.idtool.RecordStore
 import com.watchface.idtool.UiState
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
 
 /**
  * 首页（控制中心式布局）
@@ -516,77 +518,62 @@ private fun QuickTile(
     onClick: () -> Unit
 ) {
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
+    // iOS Active state：按下时整卡变淡（不再缩放，避免视觉抖动）
     val tilePressed by interaction.collectIsPressedAsState()
-    val tilePressScale by animateFloatAsState(
-        targetValue = if (tilePressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
-        label = "tilePressScale"
+    val tilePressAlpha by animateFloatAsState(
+        targetValue = if (tilePressed) IOSPalette.pressedOpacity else 1f,
+        animationSpec = tween(90),
+        label = "tilePressAlpha"
     )
 
+    val tileShape = RoundedCornerShape(IOSPalette.cardRadius)
     Box(
         modifier = modifier
             .aspectRatio(1.55f)
-            .glassShadow(8.dp, RoundedCornerShape(22.dp))
-            .liquidGlass(
-                shape = RoundedCornerShape(22.dp),
-                blurRadius = 6.dp,
-                lensHeight = 12.dp,
-                lensAmount = 20.dp,
-                layerBlock = {
-                    scaleX = tilePressScale
-                    scaleY = tilePressScale
-                }
+            // iOS 卡片：纯白底 + 16dp 圆角 + 弥散投影，无边框
+            .shadow(
+                elevation = 4.dp,
+                shape = tileShape,
+                clip = false,
+                spotColor = Color.Black.copy(alpha = 0.06f),
+                ambientColor = Color.Black.copy(alpha = 0.03f)
             )
-            .glass(RoundedCornerShape(22.dp), rememberGlassColors())
-            .pressRipple(interaction, clipShape = RoundedCornerShape(22.dp), color = tint, intensity = 1.2f)
+            .graphicsLayer { alpha = tilePressAlpha }
+            .clip(tileShape)
+            .background(IOSPalette.card)
             .clickable(
                 interactionSource = interaction,
                 indication = null
             ) {
                 onClick()
             }
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .liquidGlass(
-                        RoundedCornerShape(12.dp),
-                        blurRadius = 4.dp,
-                        lensHeight = 8.dp,
-                        lensAmount = 12.dp
-                    )
-                    .glass(
-                        RoundedCornerShape(12.dp),
-                        rememberGlassColors()
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = Color(0xFFE9EBF4),
-                    modifier = Modifier.size(17.dp)
-                )
-            }
+            // 图标：去掉玻璃底块，直接放大加深，作为视觉重心
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (tint.alpha < 0.9f) tint else Color(0xFF555555),
+                modifier = Modifier.size(26.dp)
+            )
             Column {
                 Text(
                     text = title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.2.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = IOSPalette.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(1.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    color = IOSPalette.secondaryLabel,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -934,44 +921,33 @@ private fun PermissionStatusCard(
         )
     }
 
-    val baseGlass = rememberGlassColors()
-    val tintTop by animateColorAsState(
-        visual.tintTop ?: baseGlass.tintTop,
-        tween(450), label = "permBgTop"
-    )
-    val tintBottom by animateColorAsState(
-        visual.tintBottom ?: baseGlass.tintBottom,
-        tween(450), label = "permBgBottom"
-    )
-
+    // iOS 卡片：纯白 + 16dp 圆角 + 弥散投影
     GlassCard(
-        shape = RoundedCornerShape(24.dp),
-        tintTop = tintTop,
-        tintBottom = tintBottom,
-        contentPadding = 14.dp
+        shape = RoundedCornerShape(IOSPalette.cardRadius),
+        contentPadding = 16.dp
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
+            // 垂直居中：刷新按钮与两行文字整体居中对齐
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 状态图标徽章：激活时白色呼吸光晕，未激活时静态
+            // 状态图标：iOS 彩色圆角瓦片（激活绿 / 未激活橙 / 检测中灰）
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .glow(
-                        if (visual.active) Color.White.copy(alpha = 0.18f)
-                        else Color.White.copy(alpha = 0.08f),
-                        radiusFraction = 1.5f
-                    )
-                    .glass(CircleShape, rememberGlassColors()),
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(IOSPalette.tileRadius))
+                    .background(
+                        if (visual.active) IOSPalette.success
+                        else if (status == PermissionStatus.CHECKING) IOSPalette.tileGray
+                        else IOSPalette.warning
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     visual.icon,
                     contentDescription = null,
-                    tint = if (visual.active) Color.White
-                    else Color(0xFFB9C0D4),
-                    modifier = Modifier.size(19.dp)
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -979,34 +955,54 @@ private fun PermissionStatusCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         visual.title,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.2.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = IOSPalette.label,
+                        maxLines = 1
                     )
                     Spacer(Modifier.width(7.dp))
-                    // 状态点：激活 = 白色呼吸；未激活 = 暗灰缓慢待机呼吸
+                    // 状态点：激活绿 / 未激活灰
                     GlowDot(
-                        color = if (visual.active) Color.White
-                        else Color(0xFF6B7186),
+                        color = if (visual.active) IOSPalette.success
+                        else IOSPalette.tertiaryLabel,
                         dotSize = 7.dp
                     )
                 }
-                Spacer(Modifier.height(1.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(
                     visual.subtitle,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 13.sp,
+                    color = IOSPalette.secondaryLabel,
+                    maxLines = 2
                 )
             }
             if (status != PermissionStatus.CHECKING) {
-                GlassIconButton(
-                    icon = Icons.Default.Refresh,
-                    contentDescription = AppLocale.t("刷新"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    onClick = onRefresh,
-                    size = 32.dp
-                )
+                Spacer(Modifier.width(10.dp))
+                // 刷新按钮：白底 + 1px 描边 + 深灰图标（与文字基线垂直居中）
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(IOSPalette.card)
+                        .drawBehind {
+                            drawCircle(
+                                color = IOSPalette.separator,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                            )
+                        }
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) { onRefresh() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = AppLocale.t("刷新"),
+                        tint = Color(0xFF333333),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
@@ -1113,13 +1109,13 @@ private fun NoPermissionDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         DialogEntranceWrapper {
-            GlassCard(shape = RoundedCornerShape(28.dp), contentPadding = 24.dp) {
+            GlassCard(shape = RoundedCornerShape(20.dp), contentPadding = 22.dp, shadowElevation = 12.dp) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
-                            .size(58.dp)
-                            .glow(AppColors.warning, radiusFraction = 1.6f)
-                            .glass(CircleShape, rememberGlassColors()),
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(IOSPalette.tint),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -1178,7 +1174,7 @@ internal fun AnnouncementDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         DialogEntranceWrapper {
-            GlassCard(shape = RoundedCornerShape(28.dp), contentPadding = 24.dp) {
+            GlassCard(shape = RoundedCornerShape(20.dp), contentPadding = 22.dp, shadowElevation = 12.dp) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
@@ -1235,7 +1231,7 @@ internal fun UpdateDialog(
 ) {
     Dialog(onDismissRequest = onDismiss) {
         DialogEntranceWrapper {
-            GlassCard(shape = RoundedCornerShape(28.dp), contentPadding = 24.dp) {
+            GlassCard(shape = RoundedCornerShape(20.dp), contentPadding = 22.dp, shadowElevation = 12.dp) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
@@ -1323,14 +1319,14 @@ internal fun DownloadProgressDialog(
 
     Dialog(onDismissRequest = { if (!isDownloading) onDismiss() else onCancel() }) {
         DialogEntranceWrapper {
-            GlassCard(shape = RoundedCornerShape(28.dp), contentPadding = 24.dp) {
+            GlassCard(shape = RoundedCornerShape(20.dp), contentPadding = 22.dp, shadowElevation = 12.dp) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     if (hasError) {
                         Box(
                             modifier = Modifier
-                                .size(58.dp)
-                                .glow(AppColors.danger, radiusFraction = 1.6f)
-                                .glass(CircleShape, rememberGlassColors()),
+                                .size(56.dp)
+                            .clip(CircleShape)
+                            .background(IOSPalette.tint),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
