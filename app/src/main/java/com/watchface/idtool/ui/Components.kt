@@ -1963,7 +1963,11 @@ fun GlassNavBar(
     val chipPadHpx = with(density) { (chipPadH * 2).toPx() }
     val gapPx = with(density) { 3.dp.toPx() }
 
+    // 槽位位置：测量在「每项的外层 Box」上——它是 Row 的直接子节点，
+    // positionInParent() 才是 Row 坐标系（测量内层 Column 会得到相对各自 tab 的 x，导致胶囊卡在原地）
     var tabMetrics by remember { mutableStateOf(List<TabMetrics?>(tabs.size) { null }) }
+    // 内容宽度：只取 size.width（内层 Column 与外层 Box 同中心），用于让胶囊紧包裹图标+文字
+    var contentWidths by remember { mutableStateOf(IntArray(tabs.size) { 0 }) }
 
     // 指示胶囊位置用「连续小数索引」表达：0.0 = 第 1 个 Tab，1.5 = 第 2、3 之间
     val slot = remember { Animatable(0f) }
@@ -1977,11 +1981,18 @@ fun GlassNavBar(
 
     val activeIndex = if (dragging && previewIndex in tabs.indices) previewIndex else safeIndex
 
-    /** 内容区左右边界（含 chip 内边距，左右各扩 16dp） */
+    /**
+     * 胶囊左右边界：以**槽位中心**为圆心，半宽 = 内容实测宽/2 + 水平内边距。
+     * 中心来自外层 Box（Row 子节点，坐标正确）；宽度来自内层 Column（仅取 size）。
+     */
     fun chipBounds(i: Int): Pair<Float, Float>? {
         val m = tabMetrics.getOrNull(i) ?: return null
-        val l = m.left - chipPadHpx - gapPx / 2f
-        val r = m.left + m.width + chipPadHpx + gapPx / 2f
+        val cw = contentWidths.getOrNull(i) ?: 0
+        if (cw <= 0) return null
+        val center = m.left + m.width / 2f
+        val half = cw / 2f + chipPadHpx
+        val l = center - half - gapPx / 2f
+        val r = center + half + gapPx / 2f
         return l to r
     }
 
@@ -2016,7 +2027,7 @@ fun GlassNavBar(
         return l to (r - l)
     }
 
-    LaunchedEffect(dragging, safeIndex, tabMetrics) {
+    LaunchedEffect(dragging, safeIndex, tabMetrics, contentWidths) {
         if (dragging) return@LaunchedEffect
         dragSlot?.let {
             slot.snapTo(it)
@@ -2062,7 +2073,8 @@ fun GlassNavBar(
             }
 
             Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                // 3 个标签不再均分整个胶囊（会拉得过散）：固定项宽 + 整体居中聚拢
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2125,30 +2137,38 @@ fun GlassNavBar(
 
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .width(72.dp)
                             .height(chipHeight)
                             .graphicsLayer { alpha = rowAlpha }
                             .clickable(
                                 interactionSource = interaction,
                                 indication = null
-                            ) { if (!isSelected) onSelect(index) },
+                            ) { if (!isSelected) onSelect(index) }
+                            // 槽位测量必须挂在这一层（Row 的直接子节点）
+                            .onGloballyPositioned { coords ->
+                                val m = TabMetrics(
+                                    coords.positionInParent().x.roundToInt(),
+                                    coords.size.width
+                                )
+                                if (tabMetrics[index] != m) {
+                                    tabMetrics = tabMetrics.toMutableList()
+                                        .also { it[index] = m }
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         // ===== 垂直布局：图标在上，文字在下 =====
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
-                            modifier = Modifier
-                                .onGloballyPositioned { coords ->
-                                    val m = TabMetrics(
-                                        coords.positionInParent().x.roundToInt(),
-                                        coords.size.width
-                                    )
-                                    if (tabMetrics[index] != m) {
-                                        tabMetrics = tabMetrics.toMutableList()
-                                            .also { it[index] = m }
-                                    }
+                            // 内容宽度只取 size（x 由外层 Box 提供）
+                            modifier = Modifier.onGloballyPositioned { coords ->
+                                val w = coords.size.width
+                                if (contentWidths.getOrNull(index) != w) {
+                                    contentWidths =
+                                        contentWidths.copyOf().also { it[index] = w }
                                 }
+                            }
                         ) {
                             Icon(
                                 imageVector = tab.icon,
@@ -2174,6 +2194,22 @@ fun GlassNavBar(
 
         // ---------------- 右侧独立圆形「设置」按钮 ----------------
         if (onSettingsClick != null) {
+            val settingsInteraction = remember { MutableInteractionSource() }
+            val settingsPressed by settingsInteraction.collectIsPressedAsState()
+            // 齿轮旋转：点击时转 90°，松手回弹；iOS Active state 同步变淡
+            val gearRotation by animateFloatAsState(
+                targetValue = if (settingsPressed) 90f else 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "gearRotation"
+            )
+            val fabAlpha by animateFloatAsState(
+                targetValue = if (settingsPressed) IOSPalette.pressedOpacity else 1f,
+                animationSpec = tween(90),
+                label = "settingsFabAlpha"
+            )
             Box(
                 modifier = Modifier
                     .size(52.dp)
@@ -2184,10 +2220,11 @@ fun GlassNavBar(
                         spotColor = Color.Black.copy(alpha = 0.08f),
                         ambientColor = Color.Black.copy(alpha = 0.04f)
                     )
+                    .graphicsLayer { alpha = fabAlpha }
                     .clip(CircleShape)
                     .background(IOSPalette.card)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = settingsInteraction,
                         indication = null
                     ) { onSettingsClick() },
                 contentAlignment = Alignment.Center
@@ -2196,7 +2233,9 @@ fun GlassNavBar(
                     imageVector = Icons.Default.Settings,
                     contentDescription = "设置",
                     tint = IOSPalette.label,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer { rotationZ = gearRotation }
                 )
             }
         }
