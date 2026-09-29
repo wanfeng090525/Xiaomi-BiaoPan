@@ -2002,7 +2002,7 @@ fun GlassNavBar(
     val idleInk = Color(0xFF16181C)
     val chipSize = 52.dp
     val dockShape = RoundedCornerShape(32.dp)
-    val chipShape = RoundedCornerShape(18.dp)
+    val chipShape = RoundedCornerShape(22.dp)
 
     // 各 Tab 位置（onGloballyPositioned 采集；坐标基于内容区，指示块同处内容区故直接对齐）
     var tabMetrics by remember { mutableStateOf(List<TabMetrics?>(tabs.size) { null }) }
@@ -2022,11 +2022,20 @@ fun GlassNavBar(
     var dragging by remember { mutableStateOf(false) }
     // 拖动中的预览选中项：图标/文字高亮跟手，整页切换推迟到松手提交
     var previewIndex by remember { mutableStateOf(-1) }
+    // 拖动开始时的 safeIndex：用于计算整个 Dock 浮岛的偏移量
+    // （不是只让指示块跟手，而是整列 dock 像物理浮岛被拉动）
+    var draggingStartIndex by remember { mutableStateOf(-1) }
     val safeIndexState = rememberUpdatedState(safeIndex)
     val onSelectState = rememberUpdatedState(onSelect)
 
     // 高亮跟随的实际索引：拖动时跟手预览，否则跟随已提交选中项
     val activeIndex = if (dragging && previewIndex in tabs.indices) previewIndex else safeIndex
+
+    // 整个 Dock 浮岛的横向偏移（px）：拖动起点 tab → 当前位置，连续过渡
+    val dockOffsetX = if (dragging && draggingStartIndex in tabs.indices) {
+        val tw = tabMetrics[draggingStartIndex]?.width?.toFloat() ?: 0f
+        (slotValue - draggingStartIndex) * tw
+    } else 0f
 
     // Tab 间距 3.dp，用于把指示块覆盖到相邻 Tab 之间的缝隙
     val gapPx = with(density) { 3.dp.toPx() }
@@ -2088,32 +2097,42 @@ fun GlassNavBar(
             // 防御性最大高度：正常渲染下实际高度 = chipSize + 14dp ≈ 66dp，
             // 此限制只在 backdrop 异常回流时兜底，避免撑大屏幕
             .heightIn(max = 76.dp)
+            // 整个 Dock 浮岛跟手平移：拖动起点 tab 中心 → 当前手指位置，
+            // 视觉上像把整列物理浮岛拉过去；松手后 spring 回弹 + 切页
+            .graphicsLayer { translationX = dockOffsetX }
             .shadow(
                 elevation = 8.dp,
                 shape = dockShape,
                 clip = false,
-                spotColor = Color.Black.copy(alpha = 0.26f),
-                ambientColor = Color.Black.copy(alpha = 0.12f)
+                spotColor = Color.Black.copy(alpha = 0.30f),
+                ambientColor = Color.Black.copy(alpha = 0.14f)
             )
-            // 浅色磨砂：真实背景模糊 + 折射（用项目里的 AndroidLiquidGlass 库，
-            // 即酷安 dock 同款 Kyant 0/backdrop）
+            // 完全透明的液体玻璃：只做真实背景模糊 + 折射，不画任何固定底色。
+            // 颜色完全由 AppBackground 经 backdrop 透出——
+            // 深蓝紫背景 → Dock 显深蓝紫，浅蓝紫背景 → Dock 显浅蓝紫。
+            // 这就是酷安头条 App 那种"dock 颜色随背景变"的细节。
             .liquidGlass(
                 shape = dockShape,
-                blurRadius = 16.dp,
-                lensHeight = 8.dp,
-                lensAmount = 12.dp
+                blurRadius = 24.dp,
+                lensHeight = 10.dp,
+                lensAmount = 14.dp
             )
-            // 浅色玻璃材质：白渐变底（顶亮底暗） + 微弱黑色压边，避免浅底泛光发糊
-            .glass(
-                dockShape,
-                GlassColors(
-                    tintTop = Color.White.copy(alpha = 0.86f),
-                    tintBottom = Color.White.copy(alpha = 0.72f),
-                    highlight = Color.White.copy(alpha = 0.80f),
-                    rimBright = Color.White.copy(alpha = 0.95f),
-                    rimDim = Color.Black.copy(alpha = 0.06f)
+            // 1.2dp 亮边：透明 Dock 在任何背景下都需要一条清晰轮廓
+            .drawBehind {
+                val outline = dockShape.createOutline(size, layoutDirection, this)
+                drawOutline(
+                    outline = outline,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.55f),
+                            Color.White.copy(alpha = 0.10f)
+                        ),
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, size.height)
+                    ),
+                    style = Stroke(width = 1.2.dp.toPx())
                 )
-            )
+            }
             .padding(horizontal = 6.dp, vertical = 7.dp)
     ) {
         // 选中态：圆角矩形浅色块，垫底绘制（颜色是白底上的低透明黑 = 均匀浅灰）
@@ -2129,7 +2148,24 @@ fun GlassNavBar(
                     .width(with(density) { (indWidth + stretch).toDp() })
                     .height(chipSize)
                     .clip(chipShape)
-                    .background(idleInk.copy(alpha = 0.07f))
+                    // 选中块底色：白底上叠 6% 黑 = 比 Dock 略亮一点的浅灰
+                    .background(idleInk.copy(alpha = 0.06f))
+                    // 1dp 渐变描边：让选中块在浅色 Dock 上一眼能识别（参考头条 App 细节）
+                    .drawBehind {
+                        val outline = chipShape.createOutline(size, layoutDirection, this)
+                        drawOutline(
+                            outline = outline,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.65f),
+                                    Color.White.copy(alpha = 0.15f)
+                                ),
+                                start = Offset(0f, 0f),
+                                end = Offset(size.width, size.height)
+                            ),
+                            style = Stroke(width = 1.dp.toPx())
+                        )
+                    }
             )
         }
 
@@ -2159,6 +2195,8 @@ fun GlassNavBar(
                                     if (abs(change.position.x - downX) < viewConfiguration.touchSlop) continue
                                     isDrag = true
                                     dragging = true
+                                    // 记录拖动起点：dock 浮岛的偏移量以此为锚计算
+                                    draggingStartIndex = safeIndexState.value
                                 }
                                 val f = indexAt(change.position.x)
                                 // 只写状态，不做挂起调用（本作用域禁止）
@@ -2176,6 +2214,7 @@ fun GlassNavBar(
                                 }
                                 previewIndex = -1
                                 dragging = false
+                                draggingStartIndex = -1
                             }
                         }
                     }
@@ -2272,7 +2311,7 @@ private fun RowScope.DockTabItem(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val color by animateColorAsState(
-        targetValue = if (isSelected) brandGreen else idleInk.copy(alpha = 0.86f),
+        targetValue = if (isSelected) brandGreen else idleInk,
         animationSpec = tween(200),
         label = "dockNavColor$index"
     )
