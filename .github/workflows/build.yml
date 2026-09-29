@@ -1,23 +1,30 @@
-# GitHub Actions 云一键构建:自动生成已签名的 Debug 与 Release 两个 APK
+# GitHub Actions 云一键构建:默认生成签名 Release APK；Debug 包与 R8 混淆均可按需选择
 name: Build WatchfaceIdTool
 
 on:
   workflow_dispatch:
     inputs:
       r8:
-        description: "R8 混淆压缩（仅 Release 包）：开启=体积更小更安全，关闭=构建更快"
+        description: "R8 混淆压缩（Release 包）：开启=体积更小更安全，关闭=构建更快"
         type: choice
         default: "开启"
         options:
           - "开启"
           - "关闭"
+      debug:
+        description: "构建 Debug 包：默认关闭，只出 Release"
+        type: choice
+        default: "关闭"
+        options:
+          - "关闭"
+          - "开启"
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build Debug + Signed Release APK
+    name: Build Signed Release APK（可选 Debug）
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -41,18 +48,24 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
 
-      # 同时构建 Debug(自动签名)与 Release(使用源码 keystore/watchface.jks 自动签名)
-      # 不加 --no-daemon：保留守护进程省去 JVM 冷启动
-      # R8 开关由 workflow_dispatch 输入透传：关闭时 Release 跳过混淆压缩，明显提速
-      - name: 一键构建 Debug + 签名 Release (gradlew wrapper)
+      # 组装 Gradle 任务与参数：
+      # - Debug 包：默认不构建，输入选"开启"才追加 assembleDebug
+      # - R8：默认开启混淆；选"关闭"透传 -Pr8=false，Release 跳过混淆压缩明显提速
+      # - 不加 --no-daemon：保留守护进程省去 JVM 冷启动
+      - name: 构建 APK（gradlew wrapper，按所选选项执行）
         run: |
-          if [ "${{ github.event.inputs.r8 }}" = "关闭" ]; then
-            ./gradlew assembleDebug assembleRelease -Pr8=false
-          else
-            ./gradlew assembleDebug assembleRelease
+          TASKS="assembleRelease"
+          if [ "${{ github.event.inputs.debug }}" = "开启" ]; then
+            TASKS="assembleDebug $TASKS"
           fi
+          FLAGS=""
+          if [ "${{ github.event.inputs.r8 }}" = "关闭" ]; then
+            FLAGS="-Pr8=false"
+          fi
+          ./gradlew $TASKS $FLAGS
 
       - name: 上传 Debug APK
+        if: github.event.inputs.debug == '开启'
         uses: actions/upload-artifact@v4
         with:
           name: watchface-apk-debug
@@ -68,6 +81,19 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
+      # 计算要发布到 Release 的文件列表：Debug 仅在选择"开启"时附带
+      - name: 计算发布文件列表
+        id: relfiles
+        run: |
+          if [ "${{ github.event.inputs.debug }}" = "开启" ]; then
+            echo "files<<FILES_EOF" >> "$GITHUB_OUTPUT"
+            echo "app/build/outputs/apk/debug/*.apk" >> "$GITHUB_OUTPUT"
+            echo "app/build/outputs/apk/release/*.apk" >> "$GITHUB_OUTPUT"
+            echo "FILES_EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "files=app/build/outputs/apk/release/*.apk" >> "$GITHUB_OUTPUT"
+          fi
+
       # 构建成功后自动把 APK 原文件发布到 GitHub Release
       - name: 自动发布到 GitHub Release
         uses: softprops/action-gh-release@v2
@@ -77,10 +103,9 @@ jobs:
           body: |
             本次构建由 GitHub Actions 自动生成。
             提交: `${{ github.sha }}`
-            Debug 与签名 Release 安装包均已附上,直接下载对应 .apk 即可。
-          files: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+            R8 混淆: ${{ github.event.inputs.r8 }} ｜ Debug 包: ${{ github.event.inputs.debug }}
+            直接下载附带的 .apk 即可安装。
+          files: ${{ steps.relfiles.outputs.files }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
