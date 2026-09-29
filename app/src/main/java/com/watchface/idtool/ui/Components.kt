@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -2084,40 +2085,37 @@ fun GlassNavBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            // 防御性最大高度：放弃 backdrop 真折射后此限制只是兜底，
+            // 正常渲染下实际高度 = chipSize + 14dp ≈ 66dp
+            .heightIn(max = 76.dp)
             .shadow(
-                elevation = 14.dp,
+                elevation = 10.dp,
                 shape = dockShape,
                 clip = false,
-                spotColor = Color.Black.copy(alpha = 0.30f),
-                ambientColor = Color.Black.copy(alpha = 0.16f)
+                spotColor = Color.Black.copy(alpha = 0.28f),
+                ambientColor = Color.Black.copy(alpha = 0.14f)
             )
-            // 浅色磨砂：强模糊 + 弱折射（白底下重折射会把背景色带搅浑）
-            .liquidGlass(
-                shape = dockShape,
-                blurRadius = 18.dp,
-                lensHeight = 6.dp,
-                lensAmount = 10.dp
-            )
-            .glass(
-                dockShape,
-                GlassColors(
-                    tintTop = Color.White.copy(alpha = 0.86f),
-                    tintBottom = Color.White.copy(alpha = 0.70f),
-                    highlight = Color.White.copy(alpha = 0.80f),
-                    rimBright = Color.White.copy(alpha = 0.95f),
-                    rimDim = Color.Black.copy(alpha = 0.08f)
+            .clip(dockShape)
+            // 浅色磨砂主体：白色上下渐变（顶部稍亮模拟厚玻璃）。
+            // 放弃 liquidGlass/backdrop 折射，避免它与项目其它液态玻璃互相影响时
+            // 把 dock 的渲染层撑大。
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.84f),
+                        Color.White.copy(alpha = 0.72f)
+                    )
                 )
             )
-            // 亮边描线：浅色 Dock 压在深色 App 上需要一条清晰轮廓（glass 的自绘描边
-            // 在检出真折射层时会自动让位给库高光，故这里单独补一条克制的渐变亮边）
+            // 亮边描线：浅色 Dock 压在深色 App 上需要一条清晰轮廓
             .drawBehind {
                 val outline = dockShape.createOutline(size, layoutDirection, this)
                 drawOutline(
                     outline = outline,
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.60f),
-                            Color.White.copy(alpha = 0.10f)
+                            Color.White.copy(alpha = 0.65f),
+                            Color.White.copy(alpha = 0.12f)
                         ),
                         start = Offset(0f, 0f),
                         end = Offset(size.width, size.height)
@@ -2148,7 +2146,8 @@ fun GlassNavBar(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(chipSize)
                 .pointerInput(tabs.size) {
                     // 拖动切页：指示块与图标高亮连续跟手，松手才提交整页切换；
                     // 未超过触摸斜率仍交给 Tab 的 clickable，保证纯点击不被误判为拖动。
@@ -2221,7 +2220,7 @@ fun GlassNavBar(
                 val centerAction = center
                 Box(
                     modifier = Modifier
-                        .width(58.dp)
+                        .width(54.dp)
                         .height(chipSize),
                     contentAlignment = Alignment.Center
                 ) {
@@ -2341,7 +2340,7 @@ private fun DockCenterButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 46.dp
+    size: Dp = 44.dp
 ) {
     val brand = Color(0xFF34C759)
     val interaction = remember { MutableInteractionSource() }
@@ -2359,8 +2358,8 @@ private fun DockCenterButton(
                 scaleX = scale
                 scaleY = scale
             }
-            // 光晕画在按钮之下，外圈溢出胶囊 → 复刻图里绿色按钮外圈的那层柔光
-            .glow(brand, radiusFraction = 1.45f)
+            // 中心按钮在 Row 内（高 52dp），光晕半径不超过 Row 高度，避免溢出 Dock 浮岛外圈
+            .glow(brand, radiusFraction = 1.18f)
             .clip(CircleShape)
             .background(brand)
             .pressRipple(
