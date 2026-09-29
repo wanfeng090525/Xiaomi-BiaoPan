@@ -284,19 +284,18 @@ private fun AppContent() {
                 }
             }
 
-            // L2 底部 TabBar（iOS 白色悬浮胶囊 + 右侧圆形搜索按钮）
+            // L2 底部导航栏（iOS：3 标签垂直胶囊 + 右侧圆形设置按钮）
             GlassNavBar(
                 tabs = listOf(
                     GlassNavTab(Icons.Default.Home, "主页"),
                     GlassNavTab(Icons.Default.Build, "修改"),
-                    GlassNavTab(Icons.Default.History, "记录"),
-                    GlassNavTab(Icons.Default.Settings, "设置")
+                    GlassNavTab(Icons.Default.History, "记录")
                 ),
                 selected = when (currentPage) {
                     "home" -> 0
                     "modify" -> 1
                     "history" -> 2
-                    "settings" -> 3
+                    // 设置页由右侧圆形按钮承载，不高亮任何标签
                     else -> -1
                 },
                 onSelect = { index ->
@@ -304,14 +303,11 @@ private fun AppContent() {
                         when (index) {
                             0 -> "home"
                             1 -> "modify"
-                            2 -> "history"
-                            else -> "settings"
+                            else -> "history"
                         }
                     )
                 },
-                onSearchClick = {
-                    viewModel.showToast("搜索功能开发中")
-                },
+                onSettingsClick = { switchPage("settings") },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)

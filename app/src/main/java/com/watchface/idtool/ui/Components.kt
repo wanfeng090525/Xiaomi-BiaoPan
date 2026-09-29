@@ -65,6 +65,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -1927,18 +1928,19 @@ fun GlowDot(color: Color, modifier: Modifier = Modifier, dotSize: Dp = 8.dp) {
 }
 
 // ====================================================================
-// L3 底部 TabBar（iOS 系统风格）
+// L3 底部导航栏（iOS 设置风格 · 垂直布局）
 //
-//   · 白色悬浮胶囊（#FFF），大圆角 + 柔和投影，浮在 #F2F2F7 底色之上
-//   · 选中项：#E5F0FF 浅蓝胶囊底 + #007AFF 蓝色图标文字
-//   · 未选中：#000 黑色图标文字，无底色
-//   · 指示胶囊：点击弹簧扫动 / 拖动逐帧跟手（不位移整个 TabBar）
-//   · 右侧：独立白色圆形搜索悬浮按钮
+//   · 左侧白色胶囊（#FFF / 32dp 圆角），3 个标签「图标在上、文字在下」
+//   · 选中态：#E5F0FF 浅蓝胶囊，**刚好包裹**图标+文字（水平内边距 16dp）
+//   · 选中文字/图标 #007AFF，未选中 #8E8E93
+//   · 指示胶囊宽度跟随内容实测，不用整槽宽 → 不会撑满变形
+//   · 右侧独立白色圆形「设置」按钮（阴影 6dp / 8% 黑）
+//   · 点击弹簧扫动 + 拖动逐帧跟手
 // ====================================================================
 
 data class GlassNavTab(val icon: ImageVector, val label: String)
 
-/** Dock 内部：单个 Tab 的位置/宽度，用于滑动指示胶囊测量 */
+/** 单个 Tab **内容区**（图标+文字整体）的位置与宽度，用于指示胶囊测量 */
 private data class TabMetrics(val left: Int, val width: Int)
 
 @Composable
@@ -1947,14 +1949,19 @@ fun GlassNavBar(
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    onSearchClick: (() -> Unit)? = null
+    onSettingsClick: (() -> Unit)? = null
 ) {
     val safeIndex = if (selected in tabs.indices) selected else -1
     val density = LocalDensity.current
 
-    val pillShape = RoundedCornerShape(IOSPalette.tabBarRadius)
-    val chipShape = RoundedCornerShape(22.dp)
-    val chipSize = 44.dp
+    val pillShape = RoundedCornerShape(32.dp)
+    val chipShape = RoundedCornerShape(18.dp)
+    val pillHeight = 56.dp
+    val chipHeight = 46.dp
+    // 指示胶囊水平内边距：左右各 16dp，紧贴内容不撑满
+    val chipPadH = 16.dp
+    val chipPadHpx = with(density) { (chipPadH * 2).toPx() }
+    val gapPx = with(density) { 3.dp.toPx() }
 
     var tabMetrics by remember { mutableStateOf(List<TabMetrics?>(tabs.size) { null }) }
 
@@ -1970,11 +1977,12 @@ fun GlassNavBar(
 
     val activeIndex = if (dragging && previewIndex in tabs.indices) previewIndex else safeIndex
 
-    val gapPx = with(density) { 3.dp.toPx() }
-
-    fun slotBounds(i: Int): Pair<Float, Float> {
-        val m = tabMetrics.getOrNull(i) ?: return 0f to 0f
-        return (m.left - gapPx / 2f) to (m.left + m.width + gapPx / 2f)
+    /** 内容区左右边界（含 chip 内边距，左右各扩 16dp） */
+    fun chipBounds(i: Int): Pair<Float, Float>? {
+        val m = tabMetrics.getOrNull(i) ?: return null
+        val l = m.left - chipPadHpx - gapPx / 2f
+        val r = m.left + m.width + chipPadHpx + gapPx / 2f
+        return l to r
     }
 
     fun centerOf(i: Int): Float {
@@ -1994,16 +2002,17 @@ fun GlassNavBar(
         return (tabs.size - 1).toFloat()
     }
 
-    fun indicatorRect(f: Float): Pair<Float, Float> {
+    /** 连续索引 → 指示胶囊 rect（左右边界各自插值 → 跨 Tab 时自然拉伸） */
+    fun indicatorRect(f: Float): Pair<Float, Float>? {
         val last = tabs.size - 1
         val c = f.coerceIn(0f, last.toFloat())
         val i0 = floor(c).toInt().coerceIn(0, last)
         val i1 = (i0 + 1).coerceAtMost(last)
         val t = c - i0
-        val (l0, r0) = slotBounds(i0)
-        val (l1, r1) = slotBounds(i1)
-        val l = l0 + (l1 - l0) * t
-        val r = r0 + (r1 - r0) * t
+        val b0 = chipBounds(i0) ?: return null
+        val b1 = chipBounds(i1) ?: return null
+        val l = b0.first + (b1.first - b0.first) * t
+        val r = b0.second + (b1.second - b0.second) * t
         return l to (r - l)
     }
 
@@ -2023,42 +2032,41 @@ fun GlassNavBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ---------------- 白色悬浮胶囊 TabBar ----------------
+        // ---------------- 白色胶囊 Dock（3 标签 · 垂直布局）----------------
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(56.dp)
+                .height(pillHeight)
                 .shadow(
                     elevation = 6.dp,
                     shape = pillShape,
                     clip = false,
-                    spotColor = Color.Black.copy(alpha = 0.12f),
-                    ambientColor = Color.Black.copy(alpha = 0.06f)
+                    spotColor = Color.Black.copy(alpha = 0.08f),
+                    ambientColor = Color.Black.copy(alpha = 0.04f)
                 )
                 .clip(pillShape)
                 .background(IOSPalette.tabBar)
-                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .padding(horizontal = 8.dp, vertical = 5.dp)
         ) {
-            // 选中指示胶囊（#E5F0FF），垫底绘制
-            if (activeIndex in tabs.indices) {
-                val (indLeft, indWidth) = indicatorRect(slotValue)
+            // 选中指示胶囊：宽度跟随内容（紧包裹），不撑满整槽
+            indicatorRect(slotValue)?.let { (rawL, rawW) ->
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .offset { IntOffset(indLeft.roundToInt(), 0) }
-                        .width(with(density) { indWidth.toDp() })
-                        .height(chipSize)
+                        .offset { IntOffset(rawL.roundToInt(), 0) }
+                        .width(with(density) { rawW.toDp() })
+                        .height(chipHeight)
                         .clip(chipShape)
                         .background(IOSPalette.capsuleSelected)
                 )
             }
 
             Row(
-                horizontalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(chipSize)
+                    .height(chipHeight)
                     .pointerInput(tabs.size) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
@@ -2078,8 +2086,8 @@ fun GlassNavBar(
                                     }
                                     val f = indexAt(change.position.x)
                                     dragSlot = f
-                                    previewIndex = if (tabs.isEmpty()) -1
-                                    else f.roundToInt().coerceIn(0, tabs.size - 1)
+                                    previewIndex = f.roundToInt()
+                                        .coerceIn(0, (tabs.size - 1).coerceAtLeast(0))
                                     change.consume()
                                 }
                             } finally {
@@ -2101,76 +2109,96 @@ fun GlassNavBar(
                     val isSelected = index == activeIndex
                     val interaction = remember { MutableInteractionSource() }
                     val pressed by interaction.collectIsPressedAsState()
+                    // iOS Active state：按下整项变淡
                     val rowAlpha by animateFloatAsState(
                         targetValue = if (pressed) IOSPalette.pressedOpacity else 1f,
                         animationSpec = tween(90),
                         label = "tabPress$index"
                     )
+                    // 选中 #007AFF，未选中 #8E8E93
                     val glyph by animateColorAsState(
-                        targetValue = if (isSelected) IOSPalette.tint else IOSPalette.label,
+                        targetValue = if (isSelected) IOSPalette.tint
+                        else IOSPalette.secondaryLabel,
                         animationSpec = tween(180),
                         label = "tabColor$index"
                     )
-                    val glyphSize by animateDpAsState(
-                        targetValue = if (isSelected) 24.dp else 22.dp,
-                        animationSpec = spring(dampingRatio = 0.55f, stiffness = 680f),
-                        label = "tabIcon$index"
-                    )
 
-                    Row(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxWidth()
-                            .height(chipSize)
+                            .height(chipHeight)
                             .graphicsLayer { alpha = rowAlpha }
                             .clickable(
                                 interactionSource = interaction,
                                 indication = null
-                            ) { if (!isSelected) onSelect(index) }
-                            .onGloballyPositioned { coords ->
-                                val m = TabMetrics(
-                                    coords.positionInParent().x.roundToInt(),
-                                    coords.size.width
-                                )
-                                if (tabMetrics[index] != m) {
-                                    tabMetrics = tabMetrics.toMutableList()
-                                        .also { it[index] = m }
-                                }
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                            ) { if (!isSelected) onSelect(index) },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.label,
-                            tint = glyph,
-                            modifier = Modifier.size(glyphSize)
-                        )
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            text = tab.label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = glyph,
-                            maxLines = 1
-                        )
+                        // ===== 垂直布局：图标在上，文字在下 =====
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .onGloballyPositioned { coords ->
+                                    val m = TabMetrics(
+                                        coords.positionInParent().x.roundToInt(),
+                                        coords.size.width
+                                    )
+                                    if (tabMetrics[index] != m) {
+                                        tabMetrics = tabMetrics.toMutableList()
+                                            .also { it[index] = m }
+                                    }
+                                }
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.label,
+                                tint = glyph,
+                                modifier = Modifier.size(21.dp)
+                            )
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                text = tab.label,
+                                fontSize = 11.sp,
+                                lineHeight = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.SemiBold
+                                else FontWeight.Normal,
+                                color = glyph,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // ---------------- 右侧白色圆形搜索按钮 ----------------
-        if (onSearchClick != null) {
-            SearchFabButton(
-                modifier = Modifier.shadow(
-                    elevation = 6.dp,
-                    shape = CircleShape,
-                    clip = false,
-                    spotColor = Color.Black.copy(alpha = 0.12f),
-                    ambientColor = Color.Black.copy(alpha = 0.06f)
-                ),
-                onClick = onSearchClick
-            )
+        // ---------------- 右侧独立圆形「设置」按钮 ----------------
+        if (onSettingsClick != null) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        clip = false,
+                        spotColor = Color.Black.copy(alpha = 0.08f),
+                        ambientColor = Color.Black.copy(alpha = 0.04f)
+                    )
+                    .clip(CircleShape)
+                    .background(IOSPalette.card)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onSettingsClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "设置",
+                    tint = IOSPalette.label,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }
