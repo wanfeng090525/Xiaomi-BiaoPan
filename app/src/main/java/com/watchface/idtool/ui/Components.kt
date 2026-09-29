@@ -22,6 +22,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -1962,17 +1963,25 @@ fun GlowDot(color: Color, modifier: Modifier = Modifier, dotSize: Dp = 8.dp) {
 }
 
 // ====================================================================
-// L3 悬浮胶囊玻璃导航栏（参考图规格）
+// L3 悬浮玻璃导航栏（小米澎湃风 · 浅色磨砂 Dock）
 //
-//   · 居中悬浮胶囊容器（非通栏、自适应宽度）
-//   · 选中项：图标 + 文字双元素展开，独立圆角高亮底（圆中圆）
-//   · 未选中项：仅文字（灰色），节省横向空间
-//   · 切换时容器宽度弹性自适应 + 图标弹出动画
+//   · 大圆角毛玻璃胶囊：白色半透明 + 真实背景模糊，透出下层内容
+//   · 选中项：圆角矩形浅色块，点击弹簧扫过 / 拖动逐帧跟手
+//   · 未选中：近黑图标文字，始终「图标 + 文字」，不隐藏不塌缩
+//   · 中间：绿色圆形主操作按钮（绿底 + 白图标 + 绿色光晕）
+//   · 中心按钮区域是拖动手势死区：按住它只触发点击，不误切页
 // ====================================================================
 
 data class GlassNavTab(val icon: ImageVector, val label: String)
 
-/** Dock 内部：单个 Tab 的位置/宽度，用于滑动指示条测量 */
+/** Dock 中心主操作按钮（图中绿色「+」） */
+data class GlassNavCenter(
+    val icon: ImageVector,
+    val contentDescription: String,
+    val onClick: () -> Unit
+)
+
+/** Dock 内部：单个 Tab 的位置/宽度，用于滑动指示块测量 */
 private data class TabMetrics(val left: Int, val width: Int)
 
 @Composable
@@ -1980,47 +1989,46 @@ fun GlassNavBar(
     tabs: List<GlassNavTab>,
     selected: Int,
     onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    center: GlassNavCenter? = null
 ) {
-    // -1 = 无选中（当前页由卫星按钮承载，如设置页）
+    // -1 = 无选中
     val safeIndex = if (selected in tabs.indices) selected else -1
     val density = LocalDensity.current
 
-    // 各 Tab 位置（onGloballyPositioned 采集；坐标基于内容区，指示条同处内容区故直接对齐）
-    var tabMetrics by remember { mutableStateOf(List<TabMetrics?>(tabs.size) { null }) }
+    val brandGreen = Color(0xFF34C759)
+    val idleInk = Color(0xFF16181C)
+    val chipSize = 52.dp
+    val dockShape = RoundedCornerShape(32.dp)
+    val chipShape = RoundedCornerShape(18.dp)
 
-    // 光斑（指示条）位置用「连续小数索引」表达：0.0 = 第 1 个 Tab，1.5 = 第 2、3 个之间。
-    //   · 点击切换 → 弹簧扫到目标索引（对齐视频里光斑从旧标签扫到新标签）
+    // 各 Tab 位置（onGloballyPositioned 采集；坐标基于内容区，指示块同处内容区故直接对齐）
+    var tabMetrics by remember { mutableStateOf(List<TabMetrics?>(tabs.size) { null }) }
+    // 中心按钮在 Dock 坐标系里的左右边界：作为拖动手势死区
+    var centerZone by remember { mutableStateOf(0f to 0f) }
+
+    // 光斑（指示块）位置用「连续小数索引」表达：0.0 = 第 1 个 Tab，1.5 = 第 2、3 个之间。
+    //   · 点击切换 → 弹簧扫到目标索引
     //   · 手指拖动 → 直接取手指位置的连续索引，逐帧贴手
-    // 用单一动画量，避免位移/宽度两条动画各自为政造成的迟滞与抖动。
     val slot = remember { Animatable(0f) }
-    // 拖动中光斑的跟手位置（null = 未拖动）。
-    // 手势所在的 AwaitPointerEventScope 是 RestrictsSuspension 作用域，只能调用
-    // 该作用域自身的挂起函数，不能直接调 Animatable.snapTo，故跟手位置经此状态
-    // 传出，由下方 LaunchedEffect 在普通协程里落地。
+    // 拖动中跟手位置（null = 未拖动）
     var dragSlot by remember { mutableStateOf<Float?>(null) }
     // 渲染用位置：拖动中贴手，否则取动画值
     val slotValue = dragSlot ?: slot.value
 
-    // 拖动中：暂停「选中项驱动的弹簧」，把控制权完全交给手势，避免两个动画互相打断
+    // 拖动中：暂停「选中项驱动的弹簧」，把控制权完全交给手势
     var dragging by remember { mutableStateOf(false) }
-    // 拖动中的预览选中项：图标/文字高亮跟手，但整页切换推迟到松手提交。
-    // 拖动途中每越过一个 Tab 就切一次页会反复触发 320ms 整页转场，
-    // 页面又全是液态玻璃，这才是原来「滑动不流畅」的主因。
+    // 拖动中的预览选中项：图标/文字高亮跟手，整页切换推迟到松手提交
     var previewIndex by remember { mutableStateOf(-1) }
-    // 手势闭包内必须读到最新值：pointerInput 只在 key 变化时重启，直接捕获
-    // safeIndex / onSelect 会读到首次组合时的旧值——这正是原来
-    //「拖动只能在前两个 Tab 之间来回」的根因。
     val safeIndexState = rememberUpdatedState(safeIndex)
     val onSelectState = rememberUpdatedState(onSelect)
 
-    // 高亮/光斑跟随的实际索引：拖动时跟手预览，否则跟随已提交选中项
+    // 高亮跟随的实际索引：拖动时跟手预览，否则跟随已提交选中项
     val activeIndex = if (dragging && previewIndex in tabs.indices) previewIndex else safeIndex
 
-    // Tab 间距 3.dp，用于把光斑覆盖到相邻 Tab 之间的缝隙
+    // Tab 间距 3.dp，用于把指示块覆盖到相邻 Tab 之间的缝隙
     val gapPx = with(density) { 3.dp.toPx() }
 
-    // 第 i 个 Tab 的「槽」左右边界（含左右半个间距 → 相邻槽首尾相接，不留空档）
     fun slotBounds(i: Int): Pair<Float, Float> {
         val m = tabMetrics.getOrNull(i) ?: return 0f to 0f
         return (m.left - gapPx / 2f) to (m.left + m.width + gapPx / 2f)
@@ -2045,7 +2053,7 @@ fun GlassNavBar(
         return (tabs.size - 1).toFloat()
     }
 
-    // 连续索引 → 光斑 rect：左右边界各自插值，宽度随相邻 Tab 宽度自然形变
+    // 连续索引 → 指示块 rect：左右边界各自插值，宽度随相邻 Tab 宽度自然形变
     fun indicatorRect(f: Float): Pair<Float, Float> {
         val last = tabs.size - 1
         val c = f.coerceIn(0f, last.toFloat())
@@ -2059,7 +2067,7 @@ fun GlassNavBar(
         return l to (r - l)
     }
 
-    // 选中项变化 → 光斑弹簧扫到目标 Tab；拖动期间不动，交由手势跟手
+    // 选中项变化 → 指示块弹簧扫到目标 Tab；拖动期间不动，交由手势跟手
     LaunchedEffect(dragging, safeIndex, tabMetrics) {
         if (dragging) return@LaunchedEffect
         dragSlot?.let {
@@ -2072,240 +2080,303 @@ fun GlassNavBar(
         }
     }
 
-    // AndroidLiquidGlass 深度对接（LiquidBottomTabs 参考规格）：
-    //   · tabsBackdrop  记录 Dock 自身图标/文字，指示条经 CombinedBackdrop 一并折射
-    //   · pressProgress 选中 Tab 按压进度：折射加深 + 色散 + 内阴影 + 面板弹簧放大
-    val appBackdrop = LocalAppBackdrop.current
-    val tabsBackdrop = rememberLayerBackdrop()
-    val indicatorBackdrop = if (appBackdrop != null) rememberCombinedBackdrop(appBackdrop, tabsBackdrop) else null
-    var pressedTabIndex by remember { mutableStateOf(-1) }
-    val pressProgress by animateFloatAsState(
-        targetValue = if (safeIndex >= 0 && (pressedTabIndex == safeIndex || dragging)) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f, visibilityThreshold = 0.001f),
-        label = "tabPressProgress"
-    )
-
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .liquidGlass(
-                // G2 连续胶囊：官方 shapes 库，圆角更圆润
-                shape = Capsule(),
-                blurRadius = 8.dp,
-                lensHeight = 20.dp,
-                lensAmount = 24.dp,
-                layerBlock = {
-                    val s = 1f + 0.015f * pressProgress
-                    scaleX = s
-                    scaleY = s
-                }
+            .shadow(
+                elevation = 14.dp,
+                shape = dockShape,
+                clip = false,
+                spotColor = Color.Black.copy(alpha = 0.30f),
+                ambientColor = Color.Black.copy(alpha = 0.16f)
             )
-            .glass(RoundedCornerShape(50), rememberGlassColors())
-            .padding(horizontal = 8.dp, vertical = 8.dp)
+            // 浅色磨砂：强模糊 + 弱折射（白底下重折射会把背景色带搅浑）
+            .liquidGlass(
+                shape = dockShape,
+                blurRadius = 18.dp,
+                lensHeight = 6.dp,
+                lensAmount = 10.dp
+            )
+            .glass(
+                dockShape,
+                GlassColors(
+                    tintTop = Color.White.copy(alpha = 0.86f),
+                    tintBottom = Color.White.copy(alpha = 0.70f),
+                    highlight = Color.White.copy(alpha = 0.80f),
+                    rimBright = Color.White.copy(alpha = 0.95f),
+                    rimDim = Color.Black.copy(alpha = 0.08f)
+                )
+            )
+            // 亮边描线：浅色 Dock 压在深色 App 上需要一条清晰轮廓（glass 的自绘描边
+            // 在检出真折射层时会自动让位给库高光，故这里单独补一条克制的渐变亮边）
+            .drawBehind {
+                val outline = dockShape.createOutline(size, layoutDirection, this)
+                drawOutline(
+                    outline = outline,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.60f),
+                            Color.White.copy(alpha = 0.10f)
+                        ),
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, size.height)
+                    ),
+                    style = Stroke(width = 1.2.dp.toPx())
+                )
+            }
+            .padding(horizontal = 6.dp, vertical = 7.dp)
     ) {
-        // 隐藏副本行：透明绘制进 tabsBackdrop，供指示条折射采样
-        // （参考组件同款手法：副本先行绘制，保证指示条读取到当帧内容）
+        // 选中态：圆角矩形浅色块，垫底绘制（颜色是白底上的低透明黑 = 均匀浅灰）
+        if (activeIndex in tabs.indices) {
+            val (indLeft, indWidth) = indicatorRect(slotValue)
+            // 离目标越远越拉伸，横跨两个 Tab
+            val travel = abs(slotValue - activeIndex.toFloat())
+            val stretch = with(density) { (travel * 60.dp.toPx()).coerceAtMost(56.dp.toPx()) }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset { IntOffset((indLeft - stretch / 2f).roundToInt(), 0) }
+                    .width(with(density) { (indWidth + stretch).toDp() })
+                    .height(chipSize)
+                    .clip(chipShape)
+                    .background(idleInk.copy(alpha = 0.07f))
+            )
+        }
+
         Row(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer { alpha = 0f }
-                .layerBackdrop(tabsBackdrop)
-        ) {
-            tabs.forEachIndexed { _, tab ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Icon(
-                        tab.icon,
-                        contentDescription = null,
-                        tint = Color(0xFFF3F5FA),
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = tab.label,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.2.sp,
-                        color = Color(0xFFF3F5FA),
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        // 滑动高亮光斑：真实液态玻璃面板（折射背景 + Dock 内容），垫底绘制。
-        // 位置/宽度每帧由连续索引派生 → 拖动贴手、点击弹簧扫过
-        if (activeIndex in tabs.indices) {
-            val (indLeft, indWidth) = indicatorRect(slotValue)
-            // 离目标越远越拉伸，横跨两个Tab → 复刻视频里气泡拉长效果
-            val travel = abs(slotValue - activeIndex.toFloat())
-            val stretch = with(density) { (travel * 70.dp.toPx()).coerceAtMost(80.dp.toPx()) }
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset((indLeft - stretch / 2f).roundToInt(), 0) }
-                    .width(with(density) { (indWidth + stretch).toDp() })
-                    .height(56.dp)
-                    .then(
-                        if (indicatorBackdrop != null) {
-                            Modifier.liquidGlassPanel(
-                                backdrop = indicatorBackdrop,
-                                shape = Capsule(),
-                                pressProgress = { pressProgress }
-                            )
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .glow(Color.White.copy(alpha = 0.3f), radiusFraction = 1.7f)
-                    .glass(
-                        RoundedCornerShape(28.dp),
-                        GlassColors(
-                            tintTop = Color.White.copy(alpha = 0.6f),
-                            tintBottom = Color.White.copy(alpha = 0.35f),
-                            highlight = Color.White.copy(alpha = 0.6f),
-                            rimBright = Color.White.copy(alpha = 0.95f),
-                            rimDim = Color.Black.copy(alpha = 0.05f)
-                        )
-                    )
-            )
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.pointerInput(tabs.size) {
-                // 拖动切页：光斑与图标高亮连续跟手，松手才提交整页切换；
-                // 未超过触摸斜率仍交给 Tab 的 clickable，保证纯点击不被误判为拖动。
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val downX = down.position.x
-                    var isDrag = false
-                    try {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: break
-                            if (!change.pressed) break
-                            if (!isDrag) {
-                                // 未超过触摸斜率前不算拖拽（避免点击时双重切换）
-                                if (abs(change.position.x - downX) <
-                                    viewConfiguration.touchSlop
-                                ) continue
-                                isDrag = true
-                                dragging = true
+                .fillMaxSize()
+                .pointerInput(tabs.size) {
+                    // 拖动切页：指示块与图标高亮连续跟手，松手才提交整页切换；
+                    // 未超过触摸斜率仍交给 Tab 的 clickable，保证纯点击不被误判为拖动。
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val zone = centerZone
+                        // 起点落在中心按钮上：整段手势让给它，点击优先
+                        if (down.position.x in zone.first..zone.second) return@awaitEachGesture
+                        val downX = down.position.x
+                        var isDrag = false
+                        try {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: break
+                                if (!change.pressed) break
+                                if (!isDrag) {
+                                    // 未超过触摸斜率前不算拖拽（避免点击时双重切换）
+                                    if (abs(change.position.x - downX) < viewConfiguration.touchSlop) continue
+                                    isDrag = true
+                                    dragging = true
+                                }
+                                val f = indexAt(change.position.x)
+                                // 只写状态，不做挂起调用（本作用域禁止）
+                                dragSlot = f
+                                previewIndex = f.roundToInt().coerceIn(0, tabs.size - 1)
+                                // 消费拖动事件，避免子 Tab 的 clickable 在松手时补一次点击
+                                change.consume()
                             }
-                            val f = indexAt(change.position.x)
-                            // 只写状态，不做挂起调用（本作用域禁止）
-                            dragSlot = f
-                            previewIndex = f.roundToInt().coerceIn(0, tabs.size - 1)
-                            // 消费拖动事件，避免子 Tab 的 clickable 在松手时补一次点击
-                            change.consume()
-                        }
-                    } finally {
-                        if (isDrag) {
-                            // 松手才真正切页：整段拖动只触发一次整页转场，避免拖动途中抖动
-                            val target = previewIndex
-                            if (target in tabs.indices && target != safeIndexState.value) {
-                                onSelectState.value(target)
+                        } finally {
+                            if (isDrag) {
+                                // 松手才真正切页：整段拖动只触发一次整页转场，避免拖动途中抖动
+                                val target = previewIndex
+                                if (target in tabs.indices && target != safeIndexState.value) {
+                                    onSelectState.value(target)
+                                }
+                                previewIndex = -1
+                                dragging = false
                             }
-                            previewIndex = -1
-                            dragging = false
                         }
                     }
                 }
-            }
         ) {
-            tabs.forEachIndexed { index, tab ->
-                // 用 activeIndex：拖动时图标/文字高亮跟手预览，松手提交后与选中项一致
-                val isSelected = index == activeIndex
-                val interaction = remember { MutableInteractionSource() }
-                // 按压追踪：选中 Tab 的按压进度驱动液态指示条折射/色散/放大
-                val tabPressed by interaction.collectIsPressedAsState()
-                LaunchedEffect(tabPressed) {
-                    if (tabPressed) {
-                        pressedTabIndex = index
-                    } else if (pressedTabIndex == index) {
-                        pressedTabIndex = -1
-                    }
-                }
-                // iOS 液态 Dock：所有 Tab 始终同时显示「图标 + 文字」，
-                // 非选中整体收缩 + 变暗，选中项以弹簧微弹到全亮 + 原大。
-                // 选中态的玻璃指示条在底层随切换弹滑，避免"仅选中展开图标"的割裂动画。
-                val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) {
-                        if (dragging) Color(0xFF1A1A1A) else Color(0xFFF3F5FA)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                    },
-                    animationSpec = tween(220),
-                    label = "navColor$index"
-                )
-                val contentAlpha by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.46f,
-                    animationSpec = tween(200),
-                    label = "navAlpha$index"
-                )
-                val contentScale by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.89f,
-                    animationSpec = spring(dampingRatio = 0.55f, stiffness = 680f),
-                    label = "navScale$index"
-                )
+            val leftCount = if (center != null) tabs.size / 2 else tabs.size
 
-                Box(
+            tabs.take(leftCount).forEachIndexed { index, tab ->
+                DockTabItem(
+                    tab = tab,
+                    index = index,
+                    isSelected = index == activeIndex,
+                    onSelect = { onSelect(index) },
+                    brandGreen = brandGreen,
+                    idleInk = idleInk,
+                    chipShape = chipShape,
                     modifier = Modifier
                         .weight(1f)
-                        .height(56.dp)
+                        .height(chipSize)
                         .onGloballyPositioned { coords ->
-                            val m = TabMetrics(coords.positionInParent().x.roundToInt(), coords.size.width)
+                            val m = TabMetrics(
+                                coords.positionInParent().x.roundToInt(),
+                                coords.size.width
+                            )
                             if (tabMetrics[index] != m) {
                                 tabMetrics = tabMetrics.toMutableList().also { it[index] = m }
                             }
                         }
-                        .pressRipple(
-                            interaction,
-                            clipShape = RoundedCornerShape(28.dp),
-                            color = Color.White,
-                            intensity = 1.1f
-                        )
-                        .clickable(interactionSource = interaction, indication = null) {
-                            if (!isSelected) {
-                                onSelect(index)
-                            }
-                        },
+                )
+            }
+
+            if (center != null) {
+                val centerAction = center
+                Box(
+                    modifier = Modifier
+                        .width(58.dp)
+                        .height(chipSize),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.graphicsLayer {
-                            scaleX = contentScale
-                            scaleY = contentScale
-                            alpha = contentAlpha
+                    DockCenterButton(
+                        icon = centerAction.icon,
+                        contentDescription = centerAction.contentDescription,
+                        onClick = centerAction.onClick,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            val l = coords.positionInParent().x
+                            val r = l + coords.size.width
+                            if (centerZone.first != l || centerZone.second != r) {
+                                centerZone = l to r
+                            }
                         }
-                    ) {
-                        Icon(
-                            tab.icon,
-                            contentDescription = tab.label,
-                            tint = contentColor,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = tab.label,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 0.2.sp,
-                            color = contentColor,
-                            maxLines = 1
-                        )
-                    }
+                    )
                 }
             }
+
+            tabs.drop(leftCount).forEachIndexed { offset, tab ->
+                val index = offset + leftCount
+                DockTabItem(
+                    tab = tab,
+                    index = index,
+                    isSelected = index == activeIndex,
+                    onSelect = { onSelect(index) },
+                    brandGreen = brandGreen,
+                    idleInk = idleInk,
+                    chipShape = chipShape,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(chipSize)
+                        .onGloballyPositioned { coords ->
+                            val m = TabMetrics(
+                                coords.positionInParent().x.roundToInt(),
+                                coords.size.width
+                            )
+                            if (tabMetrics[index] != m) {
+                                tabMetrics = tabMetrics.toMutableList().also { it[index] = m }
+                            }
+                        }
+                )
+            }
         }
+    }
+}
+
+/** Dock 单个 Tab：图标在上、文字在下，选中变绿并轻微放大 */
+@Composable
+private fun RowScope.DockTabItem(
+    tab: GlassNavTab,
+    index: Int,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    brandGreen: Color,
+    idleInk: Color,
+    chipShape: Shape,
+    modifier: Modifier = Modifier
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val color by animateColorAsState(
+        targetValue = if (isSelected) brandGreen else idleInk.copy(alpha = 0.86f),
+        animationSpec = tween(200),
+        label = "dockNavColor$index"
+    )
+    val contentScale by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0.94f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 680f),
+        label = "dockNavScale$index"
+    )
+    val iconSize by animateDpAsState(
+        targetValue = if (isSelected) 24.dp else 22.dp,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 680f),
+        label = "dockNavIcon$index"
+    )
+    val labelSize by animateDpAsState(
+        targetValue = if (isSelected) 12.sp else 11.sp,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 680f),
+        label = "dockNavLabel$index"
+    )
+
+    Box(
+        modifier = modifier
+            .pressRipple(interaction, clipShape = chipShape, color = idleInk, intensity = 0.45f)
+            .clickable(interactionSource = interaction, indication = null) { onSelect() },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.graphicsLayer {
+                scaleX = contentScale
+                scaleY = contentScale
+            }
+        ) {
+            Icon(
+                tab.icon,
+                contentDescription = tab.label,
+                tint = color,
+                modifier = Modifier.size(iconSize)
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = tab.label,
+                fontSize = labelSize,
+                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                color = color,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/** Dock 中心绿色圆形主操作按钮：绿底 + 白图标 + 外扩绿色光晕 */
+@Composable
+private fun DockCenterButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 46.dp
+) {
+    val brand = Color(0xFF34C759)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.86f else 1f,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = 1400f),
+        label = "dockCenterScale"
+    )
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            // 光晕画在按钮之下，外圈溢出胶囊 → 复刻图里绿色按钮外圈的那层柔光
+            .glow(brand, radiusFraction = 1.45f)
+            .clip(CircleShape)
+            .background(brand)
+            .pressRipple(
+                interaction,
+                clipShape = CircleShape,
+                color = Color.White,
+                intensity = 0.9f
+            )
+            .clickable(interactionSource = interaction, indication = null) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(24.dp)
+        )
     }
 }
 

@@ -110,6 +110,32 @@ import com.watchface.idtool.UiState
  *   3. 快捷操作    2×2 玻璃瓷砖网格（参考图圆形开关阵列）
  *   4. 已导入文件  列表
  */
+/**
+ * 表盘文件选择器：选定文件后回调 (Uri, 文件名)。
+ * 首页「选择文件」与 Dock 中心「+」共用，避免两处各写一份文件名解析。
+ */
+@Composable
+fun rememberWatchfacePicker(onPicked: (Uri, String) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        val fileName = try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameIndex >= 0 && cursor.moveToFirst()) cursor.getString(nameIndex) else null
+            }
+        } catch (_: Exception) {
+            null
+        } ?: uri.toString().substringAfterLast("/").let { name ->
+            java.net.URLDecoder.decode(name, "UTF-8")
+        }
+        onPicked(uri, fileName)
+    }
+    return { launcher.launch(arrayOf("*/*")) }
+}
+
 @Composable
 fun WelcomeScreen(
     viewModel: MainViewModel,
@@ -119,24 +145,10 @@ fun WelcomeScreen(
 ) {
     val context = LocalContext.current
 
-    // 首页直接选择文件 → 加载并跳转修改页
-    val filePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let {
-            val fileName = try {
-                context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0 && cursor.moveToFirst()) cursor.getString(nameIndex) else null
-                }
-            } catch (_: Exception) {
-                null
-            } ?: it.toString().substringAfterLast("/").let { name ->
-                java.net.URLDecoder.decode(name, "UTF-8")
-            }
-            viewModel.loadFile(it, fileName)
-            onNavigateToModify()
-        }
+    // 首页直接选择文件 → 加载并跳转修改页（与 Dock 中心「+」共用同一选择器）
+    val launchFilePicker = rememberWatchfacePicker { uri, fileName ->
+        viewModel.loadFile(uri, fileName)
+        onNavigateToModify()
     }
 
     // 密钥提取ZIP文件选择器 — 选择后自动提取
@@ -271,7 +283,7 @@ fun WelcomeScreen(
                     modifier = Modifier.weight(1f),
                     onClick = {
                         if (!viewModel.requireLogin()) return@QuickTile
-                        filePicker.launch(arrayOf("*/*"))
+                        launchFilePicker()
                     }
                 )
             }
