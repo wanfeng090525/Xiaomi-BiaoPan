@@ -2448,6 +2448,10 @@ fun ConfirmDialog(
     title: String,
     message: String,
     confirmText: String = "删除",
+    /** 可选复选项文本（如「同时删除本地文件」），null 则不显示 */
+    checkboxText: String? = null,
+    checked: Boolean = false,
+    onCheckedChange: ((Boolean) -> Unit)? = null,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -2488,6 +2492,32 @@ fun ConfirmDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
+
+                    if (checkboxText != null && onCheckedChange != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = AppLocale.t(checkboxText),
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = checked,
+                                onCheckedChange = onCheckedChange,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = IOSPalette.tint,
+                                    uncheckedThumbColor = Color.White,
+                                    uncheckedTrackColor = IOSPalette.separator,
+                                    uncheckedBorderColor = Color.Transparent
+                                )
+                            )
+                        }
+                    }
 
                     Spacer(Modifier.height(18.dp))
                     Row(

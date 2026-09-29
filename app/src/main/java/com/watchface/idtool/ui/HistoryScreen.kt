@@ -174,11 +174,16 @@ fun HistoryScreen(
 
     // ============ 删除确认弹窗 ============
     showDeleteDialog?.let { idx ->
+        // 每次弹窗重置为「仅删除记录」
+        var deleteLocalFile by remember(showDeleteDialog) { mutableStateOf(false) }
         ConfirmDialog(
             title = "删除记录",
             message = "确定要删除这条修改记录吗？",
+            checkboxText = "同时删除本地文件",
+            checked = deleteLocalFile,
+            onCheckedChange = { deleteLocalFile = it },
             onConfirm = {
-                viewModel.deleteRecord(idx, false)
+                viewModel.deleteRecord(idx, deleteLocalFile)
                 showDeleteDialog = null
             },
             onDismiss = { showDeleteDialog = null }
@@ -187,11 +192,15 @@ fun HistoryScreen(
 
     // ============ 清空确认弹窗 ============
     if (showClearAllDialog) {
+        var clearLocalFiles by remember { mutableStateOf(false) }
         ConfirmDialog(
             title = "清空全部记录",
             message = AppLocale.tf("将删除全部 {0} 条记录，该操作不可恢复。", records.size),
+            checkboxText = "同时删除本地文件",
+            checked = clearLocalFiles,
+            onCheckedChange = { clearLocalFiles = it },
             onConfirm = {
-                viewModel.clearAllRecords(false)
+                viewModel.clearAllRecords(clearLocalFiles)
                 showClearAllDialog = false
             },
             onDismiss = { showClearAllDialog = false }
