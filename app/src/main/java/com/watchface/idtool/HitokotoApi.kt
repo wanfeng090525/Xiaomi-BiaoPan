@@ -50,7 +50,17 @@ object HitokotoApi {
         Hitokoto("Not all those who wander are lost.", "J.R.R. Tolkien"),
         Hitokoto("Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away.", "Antoine de Saint-Exupéry"),
         Hitokoto("Stay hungry, stay foolish.", "Steve Jobs"),
-        Hitokoto("And those who were seen dancing were thought to be insane by those who could not hear the music.", "Nietzsche")
+        Hitokoto("And those who were seen dancing were thought to be insane by those who could not hear the music.", "Nietzsche"),
+        Hitokoto("Simplicity is the ultimate sophistication.", "Leonardo da Vinci"),
+        Hitokoto("The best way to predict the future is to invent it.", "Alan Kay"),
+        Hitokoto("We are all in the gutter, but some of us are looking at the stars.", "Oscar Wilde"),
+        Hitokoto("It always seems impossible until it's done.", "Nelson Mandela"),
+        Hitokoto("In the middle of difficulty lies opportunity.", "Albert Einstein"),
+        Hitokoto("Whatever you do, do it well.", "Walt Disney"),
+        Hitokoto("The only way to do great work is to love what you do.", "Steve Jobs"),
+        Hitokoto("Do not go gentle into that good night.", "Dylan Thomas"),
+        Hitokoto("Quality is not an act, it is a habit.", "Aristotle"),
+        Hitokoto("The journey of a thousand miles begins with a single step.", "Lao Tzu")
     )
 
     /** 断网/异常兜底：按当前语言取内置句子 */
