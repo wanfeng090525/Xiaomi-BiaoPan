@@ -2529,11 +2529,12 @@ fun ToastMessage(message: String, onFinished: () -> Unit) {
             ) { it / 2 },
             exit = fadeOut(tween(220)) + slideOutVertically(tween(240)) { it / 3 }
         ) {
-            GlassCard(
-                shape = RoundedCornerShape(50),
-                contentPadding = 0.dp,
-                tintTop = Color(0xFF3C3F52).copy(alpha = 0.88f),
-                tintBottom = Color(0xFF23252F).copy(alpha = 0.82f)
+            // 深色半透明胶囊（iOS 风格）：GlassCard 的 tint 参数不生效，白卡上白字不可读
+            Box(
+                modifier = Modifier
+                    .shadow(8.dp, RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF3C3F52).copy(alpha = 0.94f))
             ) {
                 Text(
                     text = message,

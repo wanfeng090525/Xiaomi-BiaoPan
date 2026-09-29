@@ -97,6 +97,21 @@ import com.watchface.idtool.RecordStore
 import com.watchface.idtool.UiState
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.window.DialogProperties
 
 /**
  * 首页（控制中心式布局）
@@ -1125,71 +1140,287 @@ internal fun UpdateDialog(
     onUpdate: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         DialogEntranceWrapper {
-            GlassCard(shape = RoundedCornerShape(20.dp), contentPadding = 22.dp, shadowElevation = 12.dp) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // ColorOS 16 海洋风更新弹窗：深色卡 + 动态波浪 + 渐变大字版本号
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 26.dp, vertical = 28.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(Color(0xFF15161A))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(22.dp))
+            ) {
+                // ===== 海洋动画区（波浪 / 气泡 / 大版本号）=====
+                OceanHeader(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1164f / 860f),
+                    majorVersion = latestVersion.substringBefore('.').ifEmpty { "16" }
+                )
+
+                // ===== 文案与操作区 =====
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 31.dp)
+                ) {
+                    Spacer(Modifier.height(26.dp))
+                    Text(
+                        text = "发现软件新版本",
+                        fontSize = 16.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    val releaseUrl = "https://github.com/wanfeng090525/Xiaomi-BiaoPan/releases/latest"
+                    val context = LocalContext.current
+                    val descStyle = SpanStyle(color = Color(0xFFD8DADE))
+                    val linkStyle = SpanStyle(
+                        color = Color(0xFF3B9DFF),
+                        fontWeight = FontWeight.Medium
+                    )
+                    val annotated = buildAnnotatedString {
+                        withStyle(descStyle) {
+                            append("XiaomBP $latestVersion 带来更稳定、更流畅的使用体验。")
+                        }
+                        pushStringAnnotation(tag = "URL", annotation = releaseUrl)
+                        withStyle(linkStyle) { append(" 查看详情") }
+                        pop()
+                    }
+                    ClickableText(
+                        text = annotated,
+                        style = TextStyle(
+                            fontSize = 12.5.sp,
+                            lineHeight = 18.sp,
+                            letterSpacing = 0.2.sp
+                        ),
+                        onClick = { offset ->
+                            annotated.getStringAnnotations("URL", offset, offset)
+                                .firstOrNull()?.let {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(it.item))
+                                        )
+                                    }
+                                }
+                        }
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    // 下载并安装：深灰渐变胶囊（ColorOS 规格）
                     Box(
                         modifier = Modifier
-                            .size(58.dp)
-                            .glow(IOSPalette.tileTeal.copy(alpha = 0.22f), radiusFraction = 1.4f)
-                            .glass(CircleShape, rememberGlassColors()),
+                            .fillMaxWidth()
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF4A4C52), Color(0xFF3A3C42))
+                                )
+                            )
+                            .clickable { onUpdate() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                        Text(
+                            text = "下载并安装",
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            letterSpacing = 1.sp
                         )
                     }
-
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(20.dp))
                     Text(
-                        text = "发现新版本",
-                        fontSize = 18.sp,
+                        text = "稍后安装",
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color.White.copy(alpha = 0.92f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(50))
+                            .clickable { onDismiss() }
+                            .padding(vertical = 6.dp)
                     )
-                    Spacer(Modifier.height(12.dp))
-                    GlassCard(
-                        shape = RoundedCornerShape(16.dp),
-                        contentPadding = 12.dp
-                    ) {
-                        Column {
-                            Text(
-                                text = AppLocale.tf("当前版本  v{0}", BuildConfig.VERSION_NAME),
-                                fontSize = 12.sp,
-                                fontFamily = NumericFonts,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = AppLocale.tf("最新版本  v{0}", latestVersion),
-                                fontSize = 12.sp,
-                                fontFamily = NumericFonts,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-                    GlassButton(
-                        text = "下载更新",
-                        icon = Icons.Default.Download,
-                        onClick = onUpdate,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    GlassButton(
-                        text = "稍后再说",
-                        onClick = onDismiss,
-                        style = GlassButtonStyle.Glass,
-                        shimmer = false,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Spacer(Modifier.height(20.dp))
                 }
             }
+        }
+    }
+}
+
+/**
+ * 更新弹窗海洋动画区（1:1 复刻 coloros16_ocean.svg）：
+ *   · 四段式海洋渐变 + 右上高光椭圆
+ *   · 三层正弦波浪无限平移（11s / 8s / 6s，右 / 左 / 右）
+ *   · 顶层波浪带 #CFEEFF 浪沫描边
+ *   · 四颗气泡按不同周期上浮 + 呼吸淡入淡出
+ *   · 底部 fadeDown 渐隐过渡到深色卡身
+ *   · 海面上叠加渐变大字版本号 + XiaomBP
+ */
+@Composable
+private fun OceanHeader(
+    modifier: Modifier = Modifier,
+    majorVersion: String
+) {
+    val infinite = rememberInfiniteTransition(label = "ocean")
+    // 波浪相位：translate 一个波长 / 周期（右 / 左 / 右，与 SVG animateTransform 一致）
+    val tDeep by infinite.animateFloat(
+        0f, 1f, infiniteRepeatable(tween(11000, easing = LinearEasing)), label = "waveDeep"
+    )
+    val tMid by infinite.animateFloat(
+        0f, 1f, infiniteRepeatable(tween(8000, easing = LinearEasing)), label = "waveMid"
+    )
+    val tHi by infinite.animateFloat(
+        0f, 1f, infiniteRepeatable(tween(6000, easing = LinearEasing)), label = "waveHi"
+    )
+    // 气泡上浮进度（各自周期）
+    val b1 by infinite.animateFloat(0f, 1f, infiniteRepeatable(tween(7000, easing = LinearEasing)), label = "b1")
+    val b2 by infinite.animateFloat(0f, 1f, infiniteRepeatable(tween(9200, easing = LinearEasing)), label = "b2")
+    val b3 by infinite.animateFloat(0f, 1f, infiniteRepeatable(tween(8200, easing = LinearEasing)), label = "b3")
+    val b4 by infinite.animateFloat(0f, 1f, infiniteRepeatable(tween(10500, easing = LinearEasing)), label = "b4")
+
+    Box(modifier) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val w = size.width
+            val h = size.height
+            val twoPi = (2.0 * Math.PI).toFloat()
+
+            // ---- 1. 海洋基底渐变（#3AA7E8 → #1C6FC0 → #0B3F86 → #062557）----
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to Color(0xFF3AA7E8),
+                    0.35f to Color(0xFF1C6FC0),
+                    0.7f to Color(0xFF0B3F86),
+                    1f to Color(0xFF062557),
+                    startY = 0f, endY = h
+                )
+            )
+
+            // ---- 2. 右上高光椭圆（白色 55% 径向渐隐）----
+            drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color.White.copy(alpha = 0.5f), Color.Transparent),
+                    center = Offset(0.704f * w, 0.21f * h),
+                    radius = 0.33f * w
+                ),
+                topLeft = Offset(0.704f * w - 0.31f * w, 0.21f * h - 0.28f * h),
+                size = Size(0.62f * w, 0.56f * h)
+            )
+
+            // ---- 3. 三层波浪 ----
+            // baseY / amp / λ 均按 SVG 坐标比例：560/860、640/860、720/860，λ = 582/1164
+            fun wavePath(baseY: Float, amp: Float, phase: Float): Path {
+                val lambda = 0.5f * w
+                val p = Path()
+                var first = true
+                var x = -8f
+                while (x <= w + 8f) {
+                    val y = baseY - amp * kotlin.math.sin(twoPi * (x / lambda) + phase)
+                    if (first) { p.moveTo(x, y); first = false } else p.lineTo(x, y)
+                    x += 6f
+                }
+                return p
+            }
+            fun fillWave(baseY: Float, amp: Float, phase: Float, grad: Brush) {
+                val p = wavePath(baseY, amp, phase)
+                p.lineTo(w + 8f, h + 8f)
+                p.lineTo(-8f, h + 8f)
+                p.close()
+                drawPath(p, grad)
+            }
+            val waveBase = 0.575f * h
+            // 深层（向右）：#0E4A8F → #072A5E
+            fillWave(
+                0.651f * h, 0.058f * h, -twoPi * tDeep,
+                Brush.verticalGradient(
+                    listOf(Color(0xFF0E4A8F).copy(alpha = 0.95f), Color(0xFF072A5E)),
+                    startY = waveBase, endY = h
+                )
+            )
+            // 中层（向左）：#2F8FD6 → #0E5AA8
+            fillWave(
+                0.744f * h, 0.070f * h, twoPi * tMid,
+                Brush.verticalGradient(
+                    listOf(Color(0xFF2F8FD6).copy(alpha = 0.9f), Color(0xFF0E5AA8)),
+                    startY = waveBase, endY = h
+                )
+            )
+            // 高层（向右）：#8FD8FF → 透明 #3AA7E8
+            val hiY = 0.837f * h
+            fillWave(
+                hiY, 0.070f * h, -twoPi * tHi,
+                Brush.verticalGradient(
+                    listOf(Color(0xFF8FD8FF).copy(alpha = 0.95f), Color(0xFF3AA7E8).copy(alpha = 0f)),
+                    startY = waveBase, endY = h
+                )
+            )
+            // 浪沫线：顶层波浪轮廓 #CFEEFF
+            drawPath(
+                wavePath(hiY, 0.070f * h, -twoPi * tHi),
+                color = Color(0xFFCFEEFF).copy(alpha = 0.7f),
+                style = Stroke(width = 1.1.dp.toPx())
+            )
+
+            // ---- 4. fadeDown：底部渐隐到卡身深色 ----
+            drawRect(
+                brush = Brush.verticalGradient(
+                    0f to Color(0xFF15161A).copy(alpha = 0f),
+                    0.55f to Color(0xFF15161A).copy(alpha = 0.55f),
+                    1f to Color(0xFF15161A),
+                    startY = 0.60f * h, endY = h
+                ),
+                topLeft = Offset(0f, 0.60f * h),
+                size = Size(w, 0.40f * h)
+            )
+
+            // ---- 5. 四颗气泡：上浮 + 呼吸淡入淡出 ----
+            val bubbles = listOf(
+                Triple(0.189f, 1.4.dp.toPx(), b1),
+                Triple(0.412f, 1.1.dp.toPx(), b2),
+                Triple(0.653f, 1.7.dp.toPx(), b3),
+                Triple(0.842f, 1.1.dp.toPx(), b4)
+            )
+            bubbles.forEach { (cx, r, t) ->
+                val y = h * (0.46f - 0.33f * t)
+                val alpha = kotlin.math.sin(Math.PI * t).toFloat() * 0.55f
+                drawCircle(Color.White.copy(alpha = alpha), radius = r, center = Offset(cx * w, y))
+            }
+        }
+
+        // ---- 6. 大版本号 + 应用名（叠加在海面上）----
+        Column(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(top = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = majorVersion,
+                fontSize = 82.sp,
+                lineHeight = 88.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-2.5).sp,
+                fontFamily = NumericFonts,
+                style = TextStyle(
+                    brush = Brush.verticalGradient(
+                        listOf(Color.White, Color(0xFFD8ECFF))
+                    )
+                )
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "XiaomBP",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.6.sp,
+                color = Color.White
+            )
         }
     }
 }
