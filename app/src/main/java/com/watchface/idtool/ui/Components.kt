@@ -1755,32 +1755,27 @@ fun GlassIconButton(
     tintBottom: Color? = null
 ) {
     val interaction = remember { MutableInteractionSource() }
-    // 图标无彩色规格：容器与图标统一中性白玻璃
-    val colors = rememberGlassColors()
     // 按压进度走 liquidGlass layerBlock（背景折射不跟手缩放）
     val iconPressed by interaction.collectIsPressedAsState()
-    val iconScale by animateFloatAsState(
-        targetValue = if (iconPressed) 0.88f else 1f,
-        animationSpec = spring(dampingRatio = 0.52f, stiffness = 1600f),
-        label = "iconPressScale"
-    )
     Box(
         modifier = modifier
             .size(size)
-            .clip(CircleShape)
-            .glassShadow(3.dp, CircleShape)
-            .liquidGlass(
+            .shadow(
+                elevation = 2.dp,
                 shape = CircleShape,
-                blurRadius = 4.dp,
-                lensHeight = 6.dp,
-                lensAmount = 12.dp,
-                layerBlock = {
-                    scaleX = iconScale
-                    scaleY = iconScale
-                }
+                clip = false,
+                spotColor = Color.Black.copy(alpha = 0.08f),
+                ambientColor = Color.Black.copy(alpha = 0.04f)
             )
-            .glass(CircleShape, colors)
-            .pressRipple(interaction, clipShape = CircleShape, color = tint, intensity = 1.2f)
+            .graphicsLayer { alpha = if (iconPressed) IOSPalette.pressedOpacity else 1f }
+            .clip(CircleShape)
+            .background(IOSPalette.card)
+            .drawBehind {
+                drawCircle(
+                    color = IOSPalette.separator,
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            }
             .clickable(interactionSource = interaction, indication = null) {
                 onClick()
             },
@@ -1789,7 +1784,7 @@ fun GlassIconButton(
         Icon(
             icon,
             contentDescription = contentDescription,
-            tint = Color(0xFFE9EBF4),
+            tint = tint,
             modifier = Modifier.size(size * 0.47f)
         )
     }
@@ -2038,6 +2033,13 @@ fun GlassNavBar(
         }
     }
 
+    // 离开 3 个 tab（进入设置页）时：胶囊淡出并轻微缩小，而不是硬切消失
+    val capsuleVisible by animateFloatAsState(
+        targetValue = if (activeIndex in tabs.indices) 1f else 0f,
+        animationSpec = tween(220),
+        label = "capsuleVisible"
+    )
+
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -2060,16 +2062,25 @@ fun GlassNavBar(
                 .padding(horizontal = 8.dp, vertical = 5.dp)
         ) {
             // 选中指示胶囊：宽度跟随内容（紧包裹），不撑满整槽
-            indicatorRect(slotValue)?.let { (rawL, rawW) ->
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .offset { IntOffset(rawL.roundToInt(), 0) }
-                        .width(with(density) { rawW.toDp() })
-                        .height(chipHeight)
-                        .clip(chipShape)
-                        .background(IOSPalette.capsuleSelected)
-                )
+            if (capsuleVisible > 0.01f) {
+                indicatorRect(slotValue)?.let { (rawL, rawW) ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset { IntOffset(rawL.roundToInt(), 0) }
+                            .width(with(density) { rawW.toDp() })
+                            .height(chipHeight)
+                            .graphicsLayer {
+                                alpha = capsuleVisible
+                                // 淡出时轻微收缩，避免"啪"地消失
+                                val k = 0.92f + 0.08f * capsuleVisible
+                                scaleX = k
+                                scaleY = k
+                            }
+                            .clip(chipShape)
+                            .background(IOSPalette.capsuleSelected)
+                    )
+                }
             }
 
             Row(
@@ -2197,13 +2208,23 @@ fun GlassNavBar(
             val settingsInteraction = remember { MutableInteractionSource() }
             val settingsPressed by settingsInteraction.collectIsPressedAsState()
             // 齿轮旋转：点击时转 90°，松手回弹；iOS Active state 同步变淡
+            // 齿轮：按下顺时针轻转 60°，松手用弹性回正（不用 bouncy 避免过冲发僵）
             val gearRotation by animateFloatAsState(
-                targetValue = if (settingsPressed) 90f else 0f,
+                targetValue = if (settingsPressed) 60f else 0f,
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow
+                    dampingRatio = 0.55f,
+                    stiffness = 260f
                 ),
                 label = "gearRotation"
+            )
+            // 同时轻微放大，强化"被按下"的体感
+            val gearScale by animateFloatAsState(
+                targetValue = if (settingsPressed) 0.9f else 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.5f,
+                    stiffness = 420f
+                ),
+                label = "gearScale"
             )
             val fabAlpha by animateFloatAsState(
                 targetValue = if (settingsPressed) IOSPalette.pressedOpacity else 1f,
@@ -2235,7 +2256,11 @@ fun GlassNavBar(
                     tint = IOSPalette.label,
                     modifier = Modifier
                         .size(24.dp)
-                        .graphicsLayer { rotationZ = gearRotation }
+                        .graphicsLayer {
+                            rotationZ = gearRotation
+                            scaleX = gearScale
+                            scaleY = gearScale
+                        }
                 )
             }
         }

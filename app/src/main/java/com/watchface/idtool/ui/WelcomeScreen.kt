@@ -196,38 +196,7 @@ fun WelcomeScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
-        Spacer(Modifier.height(16.dp))
-
-        // ============ 品牌栏 ============
-        StaggeredItem(index = 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                LogoBadge(size = 44.dp)
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "表盘 ID 工具",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.2.sp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "WATCHFACE ID TOOL · v${BuildConfig.VERSION_NAME}",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 1.2.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                // 设置入口移至底部导航分离式圆钮
-            }
-        }
-
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(8.dp))
 
         // ============ 一言引用（Hitokoto API） ============
         StaggeredItem(index = 1) {

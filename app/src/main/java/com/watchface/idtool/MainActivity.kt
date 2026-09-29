@@ -12,7 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -115,22 +114,23 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 深色玻璃主题：状态栏/导航栏使用浅色图标
+        // 取消沉浸式：状态栏 / 导航栏常驻显示，App 内容不延伸到系统栏之下
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            )
         )
-        // 沉浸全屏：隐藏状态栏与导航栏（上滑临时呼出）
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            window.attributes.layoutInDisplayCutoutMode =
-                android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }
+        // 关键：true = 内容自动避让系统栏（不再铺到状态栏底下）
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         val controller = WindowCompat.getInsetsController(window, window.decorView)
-        controller.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-
+        // 浅色背景 → 系统栏用深色图标
+        controller.isAppearanceLightStatusBars = true
+        controller.isAppearanceLightNavigationBars = true
         setContent {
             WatchFaceTheme {
                 AppContent()
@@ -295,8 +295,9 @@ private fun AppContent() {
                     "home" -> 0
                     "modify" -> 1
                     "history" -> 2
-                    // 设置页由右侧圆形按钮承载，不高亮任何标签
-                    else -> -1
+                    // 设置页由右侧圆形按钮承载：保持高亮「主页」作为来源，
+                    // 避免出现"点进设置后 Dock 无任何选中态"的空档
+                    else -> 0
                 },
                 onSelect = { index ->
                     switchPage(

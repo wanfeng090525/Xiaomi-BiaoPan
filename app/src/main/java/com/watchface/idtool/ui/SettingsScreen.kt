@@ -113,28 +113,7 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {
-        Spacer(Modifier.height(16.dp))
-
-        // ============ 标题 ============
-        StaggeredItem(index = 0) {
-            Text(
-                text = "设置",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.3.sp,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "",//SETTINGS
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 1.6.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(8.dp))
 
         // ============ 卡密登录状态 ============
         StaggeredItem(index = 1) { SectionLabel("卡密登录") }
@@ -375,7 +354,7 @@ fun SettingsScreen(
     if (state.isCheckingCloud) {
         // 检查中弹窗：点击「检查更新 / 查看公告」后出现，8 秒超时自动关闭，可随时手动取消
         Dialog(onDismissRequest = { viewModel.cancelCloudCheck() }) {
-            GlassCard(contentPadding = 22.dp) {
+            GlassCard(contentPadding = RowInset) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -502,7 +481,7 @@ private fun SettingsDivider() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 57.dp)
+            .padding(start = RowInset + 28.dp + 12.dp)
             .height(0.5.dp)
             .background(IOSPalette.separator)
     )
@@ -570,7 +549,8 @@ private fun LoginStatusSection() {
     }
 
     GlassCard(
-        onClick = if (!loggedIn) {{ showLoginDialog = true }} else null
+        onClick = if (!loggedIn) {{ showLoginDialog = true }} else null,
+        contentPadding = RowInset
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -798,6 +778,9 @@ private data class SettingsPermVisual(
     val subtitle: String
 )
 
+/** 设置页所有行内元素的统一水平内边距（与 GlassCard 默认 contentPadding 对齐） */
+private val RowInset = 16.dp
+
 /** 密度拉条行：80% ~ 110%，松手保存并重建界面 */
 @Composable
 private fun DensitySliderRow() {
@@ -809,7 +792,7 @@ private fun DensitySliderRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 13.dp, vertical = 10.dp),
+            .padding(horizontal = RowInset, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconBadge(Icons.Default.AspectRatio, IOSPalette.tileBlue)
