@@ -20,9 +20,13 @@ import java.net.URLEncoder
 object HitokotoApi {
 
     data class Hitokoto(val text: String, val from: String) {
-        /** 完整引用串：「句子」——《 来源 》 */
+        /** 完整引用串：中文「句子 —— 《来源》」/ 英文「Sentence — Source」 */
         val attributed: String
-            get() = if (from.isBlank()) text else "$text —— $from"
+            get() {
+                if (from.isBlank()) return text
+                return if (com.watchface.idtool.ui.AppLocale.lang == "en") "$text — $from"
+                else "$text —— $from"
+            }
     }
 
     /** 内置回退句子（断网或接口异常时随机展示） */
@@ -37,10 +41,26 @@ object HitokotoApi {
         Hitokoto("每个不曾起舞的日子，都是对生命的辜负。", "尼采")
     )
 
-    private fun fallback(): Hitokoto = FALLBACKS.random()
+    /** 英文模式内置句子：一律用名言的英文原文（不回译），来源标注原文出处 */
+    private val FALLBACKS_EN = listOf(
+        Hitokoto("What's past is prologue.", "Shakespeare · The Tempest"),
+        Hitokoto("Our conquest is the sea of stars.", "Legend of the Galactic Heroes"),
+        Hitokoto("Less, but better.", "Dieter Rams"),
+        Hitokoto("There is a crack in everything, that's how the light gets in.", "Leonard Cohen · Anthem"),
+        Hitokoto("Not all those who wander are lost.", "J.R.R. Tolkien"),
+        Hitokoto("Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away.", "Antoine de Saint-Exupéry"),
+        Hitokoto("Stay hungry, stay foolish.", "Steve Jobs"),
+        Hitokoto("And those who were seen dancing were thought to be insane by those who could not hear the music.", "Nietzsche")
+    )
 
-    /** 拉取一条一言；失败返回内置句子（永不返回 null） */
+    /** 断网/异常兜底：按当前语言取内置句子 */
+    private fun fallback(): Hitokoto =
+        if (com.watchface.idtool.ui.AppLocale.lang == "en") FALLBACKS_EN.random()
+        else FALLBACKS.random()
+
+    /** 拉取一条一言；英文模式直接用内置英文句（hitokoto.cn 只提供中文），失败返回内置句子（永不返回 null） */
     suspend fun fetch(): Hitokoto = withContext(Dispatchers.IO) {
+        if (com.watchface.idtool.ui.AppLocale.lang == "en") return@withContext fallback()
         val remote = withTimeoutOrNull(5_000L) { fetchRemote() }
         remote ?: fallback()
     }

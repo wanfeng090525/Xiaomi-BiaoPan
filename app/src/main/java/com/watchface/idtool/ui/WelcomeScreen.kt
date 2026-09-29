@@ -539,8 +539,9 @@ private fun HitokotoBar() {
     var revealCount by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
-    // 每次进入组合（即每次打开 App / 回到主页）自动拉取新句
-    LaunchedEffect(Unit) {
+    // 每次进入组合（即每次打开 App / 回到主页）自动拉取新句；
+    // 以语言为 key：切换语言后立即按新语言重新取句（英文模式换内置英文语录）
+    LaunchedEffect(AppLocale.lang) {
         quote = HitokotoApi.fetch()
     }
 
