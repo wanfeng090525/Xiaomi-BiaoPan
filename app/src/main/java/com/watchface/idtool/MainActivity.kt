@@ -1,9 +1,6 @@
 package com.watchface.idtool
 
 import android.app.Activity
-import android.content.Context
-import android.content.res.Configuration
-import android.content.res.Resources
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -17,8 +14,12 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.roundToInt
 import com.watchface.idtool.ui.AppBackground
 import com.watchface.idtool.ui.GlassNavTab
 import com.watchface.idtool.ui.GlassNavBar
@@ -62,55 +62,15 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 class MainActivity : ComponentActivity() {
 
-    /** DPI 密度缩放：在 Context 附加阶段以一致的方式缩放 density/scaledDensity */
-    override fun attachBaseContext(newBase: Context) {
-        AppSettings.load(newBase)
-        val factor = AppSettings.densityFactor
-        super.attachBaseContext(
-            if (factor == 1f) newBase else DensityScaledContext(newBase, factor)
-        )
-    }
-
-    /**
-     * 按系数缩放 densityDpi，并让 density / scaledDensity / fontScale 保持同步。
-     * 仅改 densityDpi 会造成 sp 文字与 dp 布局比例不一致，导致增大密度后文字异常显示；
-     * 这里显式统一三者的转换关系，保证文字与布局同步缩放。
-     */
-    private class DensityScaledContext(base: Context, private val factor: Float) :
-        android.content.ContextWrapper(base) {
-
-        private val scaledResources: Resources by lazy {
-            val res = super.getResources()
-            val dm = res.displayMetrics
-            val baseDensity = dm.density
-            // 保留系统字体缩放，避免破坏“文字大小”辅助功能设置
-            val fontScale = if (baseDensity > 0f) dm.scaledDensity / baseDensity else 1f
-            val targetDpi = (dm.densityDpi * factor).roundToInt()
-            val newDensity = targetDpi / 160f
-
-            val cfg = Configuration(res.configuration)
-            cfg.densityDpi = targetDpi
-            cfg.fontScale = fontScale
-
-            val wrapped = base.createConfigurationContext(cfg).resources
-            wrapped.displayMetrics.apply {
-                this.density = newDensity
-                this.scaledDensity = newDensity * fontScale
-                this.densityDpi = targetDpi
-            }
-            wrapped
-        }
-
-        @Deprecated("Deprecated in Java")
-        override fun getResources(): Resources = scaledResources
-    }
-
     override fun onResume() {
         super.onResume()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 启动加载持久化设置（语言 / 背景配置 / 公告开关）
+        AppSettings.load(this)
 
         // 取消沉浸式：状态栏 / 导航栏常驻显示，App 内容不延伸到系统栏之下
         enableEdgeToEdge(
@@ -238,22 +198,53 @@ private fun AppContent() {
                 .navigationBarsPadding()
                 .imePadding()
         ) {
-            // 页面内容：方向感知的滑动 + 淡入淡出转场
+            // 页面内容：方向感知的滑动 + 淡入淡出转场；设置页走 iOS 模态转场
             AnimatedContent(
                 targetState = currentPage,
                 transitionSpec = {
                     val from = PAGES.indexOf(initialState).coerceAtLeast(0)
                     val to = PAGES.indexOf(targetState).coerceAtLeast(0)
                     val forward = to >= from
-                    val enter = fadeIn(tween(320, easing = FastOutSlowInEasing)) +
-                            slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) {
-                                if (forward) it / 4 else -it / 4
-                            }
-                    val exit = fadeOut(tween(200)) +
-                            slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) {
-                                if (forward) -it / 5 else it / 5
-                            }
-                    enter togetherWith exit
+                    if (targetState == "settings") {
+                        // 进入设置：从底部轻微上浮 + 0.95x 放大 + 淡入（iOS push 模态感）
+                        val enter = fadeIn(tween(280, easing = FastOutSlowInEasing)) +
+                                scaleIn(
+                                    initialScale = 0.95f,
+                                    animationSpec = tween(320, easing = FastOutSlowInEasing)
+                                ) +
+                                slideInVertically(tween(320, easing = FastOutSlowInEasing)) { it / 9 }
+                        // 原页面退场：淡出 + 轻微缩小下沉，让位感更自然
+                        val exit = fadeOut(tween(220)) +
+                                scaleOut(
+                                    targetScale = 0.97f,
+                                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                                )
+                        enter togetherWith exit
+                    } else if (initialState == "settings") {
+                        // 离开设置：设置页缩回淡出，目标页按方向滑入
+                        val enter = fadeIn(tween(300, easing = FastOutSlowInEasing)) +
+                                slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) {
+                                    if (forward) it / 4 else -it / 4
+                                }
+                        val exit = fadeOut(tween(240)) +
+                                scaleOut(
+                                    targetScale = 0.95f,
+                                    animationSpec = tween(280, easing = FastOutSlowInEasing)
+                                ) +
+                                slideOutVertically(tween(280, easing = FastOutSlowInEasing)) { it / 9 }
+                        enter togetherWith exit
+                    } else {
+                        // 主页面之间：保持原有方向感知的水平滑动
+                        val enter = fadeIn(tween(320, easing = FastOutSlowInEasing)) +
+                                slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) {
+                                    if (forward) it / 4 else -it / 4
+                                }
+                        val exit = fadeOut(tween(200)) +
+                                slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) {
+                                    if (forward) -it / 5 else it / 5
+                                }
+                        enter togetherWith exit
+                    }
                 },
                 label = "pageTransition"
             ) { page ->

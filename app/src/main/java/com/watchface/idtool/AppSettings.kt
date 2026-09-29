@@ -31,26 +31,16 @@ data class BgConfig(
  * 应用设置（SharedPreferences 持久化）
  *
  * · language           界面语言（中文 / 英文，"system" 跟随系统）
- * · densityFactor      显示密度缩放（DPI），拉条 80% ~ 110% 连续调节
- * · bgMode/bgColor     背景样式（默认壁纸 / 相册图片·含动图 / 纯色 / 液态动态）
+ * · bgMode/bgColor     背景样式（相册图片·含动图 / 纯色 / 液态动态）
  * · announceAutoShow   启动时自动弹出新公告（开关，默认开）
  */
 object AppSettings {
     private const val PREFS = "app_settings"
 
     private const val KEY_LANG = "language"
-    private const val KEY_DENSITY = "density_factor"
     private const val KEY_BG_MODE = "bg_mode"
     private const val KEY_BG_COLOR = "bg_color"
     private const val KEY_ANNOUNCE_AUTO = "announce_auto_show"
-
-    /** 密度拉条范围：80% ~ 110% */
-    const val DENSITY_MIN = 0.8f
-    const val DENSITY_MAX = 1.1f
-
-    @Volatile
-    var densityFactor: Float = 1.0f
-        private set
 
     /** 背景配置（Compose 响应式状态：修改后界面自动重组刷新） */
     val bgConfigState = mutableStateOf(BgConfig())
@@ -66,7 +56,6 @@ object AppSettings {
     /** 启动时加载（语言由 Compose 侧读取） */
     fun load(context: Context) {
         val p = prefs(context)
-        densityFactor = p.getFloat(KEY_DENSITY, 1.0f)
         bgConfigState.value = BgConfig(
             mode = p.getString(KEY_BG_MODE, BgMode.LIQUID) ?: BgMode.LIQUID,
             color = p.getLong(KEY_BG_COLOR, 0xFF14151F)
@@ -82,14 +71,6 @@ object AppSettings {
     fun setLanguage(context: Context, code: String) {
         prefs(context).edit().putString(KEY_LANG, code).apply()
         com.watchface.idtool.ui.AppLocale.apply(code)
-    }
-
-    // ---------- 密度 ----------
-    fun setDensityFactor(context: Context, factor: Float) {
-        // 钳制到 80% ~ 110%，并以 1% 为步长取整
-        val clamped = factor.coerceIn(DENSITY_MIN, DENSITY_MAX)
-        densityFactor = clamped
-        prefs(context).edit().putFloat(KEY_DENSITY, clamped).apply()
     }
 
     // ---------- 公告开关 ----------

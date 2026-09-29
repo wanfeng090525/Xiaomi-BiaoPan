@@ -62,7 +62,8 @@ fun InsetGroup(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            // 卡片与其他 GlassCard 分区同宽（页级 20dp 边距），
+            // 行内容统一由 [InsetListItem]/行组件自带 16dp 内边距对齐
             .clip(RoundedCornerShape(IOSPalette.cardRadius))
             .background(IOSPalette.card),
         content = content

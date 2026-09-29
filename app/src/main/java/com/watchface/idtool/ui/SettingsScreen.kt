@@ -3,8 +3,6 @@ package com.watchface.idtool.ui
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Gradient
@@ -35,19 +32,16 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,7 +58,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.watchface.idtool.AppSettings
-import com.watchface.idtool.BgMode
 import com.watchface.idtool.BuildConfig
 import com.watchface.idtool.MainViewModel
 import com.watchface.idtool.PermissionStatus
@@ -89,22 +82,7 @@ fun SettingsScreen(
     state: UiState
 ) {
     var showLangDialog by remember { mutableStateOf(false) }
-    var showBgDialog by remember { mutableStateOf(false) }
-    var showColorDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
-
-    // 相册选图启动器（GetContent 走 SAF，无需任何存储权限）
-    val bgPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null && !AppSettings.setGalleryBackground(context, uri)) {
-            android.widget.Toast.makeText(
-                context,
-                AppLocale.t("图片读取失败，请换一张试试"),
-                android.widget.Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -150,43 +128,6 @@ fun SettingsScreen(
                     subtitle = langNative,
                     onClick = { showLangDialog = true }
                 )
-                SettingsDivider()
-                // 显示密度拉条：80% ~ 110%，实时百分比
-                DensitySliderRow()
-            }
-        }
-
-        Spacer(Modifier.height(22.dp))
-
-        // ============ 背景与外观 ============
-        StaggeredItem(index = 5) { SectionLabel("背景与外观") }
-        Spacer(Modifier.height(10.dp))
-        StaggeredItem(index = 6) {
-            val bgCfg = AppSettings.bgConfig
-
-            InsetGroup {
-                SettingsRow(
-                    icon = Icons.Default.Wallpaper,
-                    iconTint = IOSPalette.tilePurple,
-                    title = "背景样式",
-                    subtitle = when (bgCfg.mode) {
-                        BgMode.GALLERY -> "自定义图片"
-                        BgMode.COLOR -> "纯色背景"
-                        BgMode.LIQUID -> "液态动态"
-                        else -> "液态动态"   // 原默认壁纸已移除，统一按液态动态展示
-                    },
-                    onClick = { showBgDialog = true }
-                )
-                if (bgCfg.mode == BgMode.COLOR) {
-                    SettingsDivider()
-                    SettingsRow(
-                        icon = Icons.Default.Palette,
-                        iconTint = IOSPalette.tileIndigo,
-                        title = "背景颜色",
-                        subtitle = "自定义纯色（保持界面可读的深色调）",
-                        onClick = { showColorDialog = true }
-                    )
-                }
             }
         }
 
@@ -317,38 +258,6 @@ fun SettingsScreen(
         )
     }
 
-    // 背景样式弹窗（相册图片 / 纯色 / 液态动态；默认壁纸已移除）
-    if (showBgDialog) {
-        BgStyleDialog(
-            current = AppSettings.bgConfig.mode,
-            onPickGallery = {
-                showBgDialog = false
-                bgPicker.launch("image/*")
-            },
-            onPickColor = {
-                AppSettings.setBackground(dialogContext, BgMode.COLOR)
-                showBgDialog = false
-                showColorDialog = true
-            },
-            onPickLiquid = {
-                AppSettings.setBackground(dialogContext, BgMode.LIQUID)
-                showBgDialog = false
-            },
-            onDismiss = { showBgDialog = false }
-        )
-    }
-
-    // 纯色背景调色弹窗（色相 / 饱和度 / 明度 + 快捷预设）
-    if (showColorDialog) {
-        ColorPickerDialog(
-            initial = AppSettings.bgConfig.color,
-            onApply = { argb ->
-                AppSettings.setBackground(dialogContext, BgMode.COLOR, argb)
-                showColorDialog = false
-            },
-            onDismiss = { showColorDialog = false }
-        )
-    }
 
     if (state.isCheckingCloud) {
         // 检查中弹窗：点击「检查更新 / 查看公告」后出现，8 秒超时自动关闭，可随时手动取消
@@ -480,7 +389,7 @@ private fun SettingsDivider() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = RowInset + 28.dp + 12.dp)
+            .padding(start = RowInset + 28.dp + 13.dp)  // 与 InsetListItem 自绘分割线 57dp 严格一致
             .height(0.5.dp)
             .background(IOSPalette.separator)
     )
@@ -779,66 +688,6 @@ private data class SettingsPermVisual(
 
 /** 设置页所有行内元素的统一水平内边距（与 GlassCard 默认 contentPadding 对齐） */
 private val RowInset = 16.dp
-
-/** 密度拉条行：80% ~ 110%，松手保存并重建界面 */
-@Composable
-private fun DensitySliderRow() {
-    val context = LocalContext.current
-    var sliderValue by remember(AppSettings.densityFactor) {
-        mutableFloatStateOf(AppSettings.densityFactor)
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = RowInset, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconBadge(Icons.Default.AspectRatio, IOSPalette.tileBlue)
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "显示密度",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = IOSPalette.label
-                )
-                Spacer(Modifier.weight(1f))
-                // 实时百分比（保时捷工程数字）
-                Text(
-                    text = "${(sliderValue * 100).roundToInt()}%",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = NumericFonts,
-                    color = IOSPalette.secondaryLabel
-                )
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = "80% ~ 110%，松手后界面重新加载",
-                fontSize = 13.sp,
-                color = IOSPalette.secondaryLabel
-            )
-            Spacer(Modifier.height(4.dp))
-            GlassSlider(
-                value = sliderValue,
-                onValueChange = { sliderValue = it },
-                onValueChangeFinished = {
-                    AppSettings.setDensityFactor(context, sliderValue)
-                    // 密度在 attachBaseContext 生效，需重建 Activity
-                    (context as? Activity)?.recreate()
-                },
-                valueRange = AppSettings.DENSITY_MIN..AppSettings.DENSITY_MAX,
-                steps = 29   // 每 1% 一档
-            )
-        }
-    }
-}
-
 // ====================================================================
 // 语言选择弹窗
 // ====================================================================
@@ -921,241 +770,3 @@ private fun LanguageDialog(
     }
 }
 
-// ====================================================================
-// 背景样式弹窗（相册图片 / 纯色 / 液态动态；默认壁纸已移除）
-// ====================================================================
-
-@Composable
-private fun BgStyleDialog(
-    current: String,
-    onPickGallery: () -> Unit,
-    onPickColor: () -> Unit,
-    onPickLiquid: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        DialogEntranceWrapper {
-            GlassCard(shape = RoundedCornerShape(28.dp), contentPadding = 18.dp) {
-                Text(
-                    text = "背景样式",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(14.dp))
-
-                data class BgOption(
-                    val mode: String,
-                    val icon: ImageVector,
-                    val title: String,
-                    val subtitle: String,
-                    val action: () -> Unit
-                )
-
-                listOf(
-                    BgOption(BgMode.LIQUID, Icons.Default.Gradient, "液态动态", "渐变光斑动态背景（默认）", onPickLiquid),
-                    BgOption(BgMode.GALLERY, Icons.Default.PhotoLibrary, "从相册选择", "自定义图片，自动适配屏幕比例", onPickGallery),
-                    BgOption(BgMode.COLOR, Icons.Default.Palette, "纯色背景", "自定义颜色（深色调）", onPickColor)
-                ).forEach { opt ->
-                    val selected = current == opt.mode
-                    GlassCard(
-                        onClick = opt.action,
-                        shape = RoundedCornerShape(18.dp),
-                        contentPadding = 13.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconBadge(opt.icon, MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = opt.title,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (selected) IOSPalette.tint
-                                    else MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = opt.subtitle,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            if (selected) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = IOSPalette.tint,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
-        }
-    }
-}
-
-// ====================================================================
-// 纯色背景调色弹窗（HSV 三通道 + 深色预设）
-// 明度限制在 6% ~ 46%：保证玻璃卡片与白色文字的可读性
-// ====================================================================
-
-/** 快捷预设（深色调，均保证界面可读） */
-private val BG_COLOR_PRESETS = listOf(
-    0xFF0E1116,  // 石墨黑
-    0xFF12172B,  // 午夜蓝
-    0xFF101F1A,  // 松林绿
-    0xFF1F1216,  // 酒红
-    0xFF1A1226,  // 暗紫
-    0xFF0E1E22,  // 深青
-    0xFF16181F,  // 炭灰
-    0xFF241A10   // 深咖
-)
-
-@Composable
-private fun ColorPickerDialog(
-    initial: Long,
-    onApply: (Long) -> Unit,
-    onDismiss: () -> Unit
-) {
-    // 初始值 → HSV
-    val initHsv = FloatArray(3).apply {
-        android.graphics.Color.colorToHSV((initial and 0xFFFFFFFFL).toInt(), this)
-    }
-    var hue by remember { mutableFloatStateOf(initHsv[0]) }
-    var sat by remember { mutableFloatStateOf(initHsv[1]) }
-    var value by remember { mutableFloatStateOf(initHsv[2].coerceIn(0.06f, 0.46f)) }
-
-    fun currentArgb(): Int {
-        val hsv = floatArrayOf(hue, sat, value)
-        return android.graphics.Color.HSVToColor(hsv)
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        DialogEntranceWrapper {
-            GlassCard(shape = RoundedCornerShape(28.dp), contentPadding = 20.dp) {
-                Text(
-                    text = "背景颜色",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(14.dp))
-
-                // 实时预览
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                        .border(
-                            width = 1.dp,
-                            color = IOSPalette.separator,
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                        .background(
-                            color = Color(currentArgb().toLong() and 0xFFFFFFFFL),
-                            shape = RoundedCornerShape(16.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Aa 预览文字 Preview",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White
-                    )
-                }
-
-                Spacer(Modifier.height(14.dp))
-
-                // 快捷预设
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    BG_COLOR_PRESETS.forEach { preset ->
-                        val argb = (preset and 0xFFFFFFFFL).toInt()
-                        val selected = run {
-                            val h = FloatArray(3).apply { android.graphics.Color.colorToHSV(argb, this) }
-                            kotlin.math.abs(h[0] - hue) < 4f && kotlin.math.abs(h[1] - sat) < 0.06f
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(30.dp)
-                                .border(
-                                    width = if (selected) 2.dp else 1.dp,
-                                    color = if (selected) Color.White else Color.White.copy(alpha = 0.20f),
-                                    shape = CircleShape
-                                )
-                                .background(color = Color(preset), shape = CircleShape)
-                                .clickable {
-                                    val h = FloatArray(3).apply { android.graphics.Color.colorToHSV(argb, this) }
-                                    hue = h[0]; sat = h[1]; value = h[2]
-                                }
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // HSV 拉条（iOS 蓝色规格，浅色弹窗下清晰可辨）
-                val sliderColors = SliderDefaults.colors(
-                    thumbColor = IOSPalette.tint,
-                    activeTrackColor = IOSPalette.tint.copy(alpha = 0.75f),
-                    inactiveTrackColor = IOSPalette.separator
-                )
-                Text(AppLocale.tf("色调  {0}°", hue.roundToInt()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Slider(
-                    value = hue,
-                    onValueChange = { hue = it },
-                    valueRange = 0f..360f,
-                    colors = sliderColors
-                )
-                Text(AppLocale.tf("饱和度  {0}%", (sat * 100).roundToInt()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Slider(
-                    value = sat,
-                    onValueChange = { sat = it },
-                    valueRange = 0f..1f,
-                    colors = sliderColors
-                )
-                Text(AppLocale.tf("明度  {0}%（深色调保证可读）", (value * 100).roundToInt()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Slider(
-                    value = value,
-                    onValueChange = { value = it },
-                    valueRange = 0.06f..0.46f,
-                    colors = sliderColors
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GlassButton(
-                        text = "取消",
-                        onClick = onDismiss,
-                        style = GlassButtonStyle.Glass,
-                        shimmer = false,
-                        modifier = Modifier.weight(1f)
-                    )
-                    GlassButton(
-                        text = "应用",
-                        onClick = { onApply(currentArgb().toLong() and 0xFFFFFFFFL) },
-                        style = GlassButtonStyle.Primary,
-                        shimmer = false,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ====================================================================
-// 显示密度选择弹窗（已由内联拉条 DensitySliderRow 取代）
-// ====================================================================
