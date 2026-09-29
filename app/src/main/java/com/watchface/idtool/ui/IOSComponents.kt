@@ -160,7 +160,8 @@ fun InsetListItem(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = title,
+                // AppLocale.t：标题/副标题过翻译词表，英文模式下自动切换
+                text = AppLocale.t(title),
                 fontSize = 17.sp,
                 lineHeight = 22.sp,
                 color = if (destructive) IOSPalette.destructive else IOSPalette.label,
@@ -168,7 +169,7 @@ fun InsetListItem(
             )
             if (subtitle != null) {
                 Text(
-                    text = subtitle,
+                    text = AppLocale.t(subtitle),
                     fontSize = 13.sp,
                     lineHeight = 17.sp,
                     color = IOSPalette.secondaryLabel,
@@ -179,7 +180,7 @@ fun InsetListItem(
 
         if (value != null) {
             Text(
-                text = value,
+                text = AppLocale.t(value),
                 fontSize = 17.sp,
                 lineHeight = 22.sp,
                 color = IOSPalette.secondaryLabel,
