@@ -371,7 +371,7 @@ object SagAuthManager {
         val card = kami.trim()
         if (card.isEmpty()) return AuthResult(false, "请输入卡密")
 
-        val v = wy!!
+        val v = wy ?: return AuthResult(false, lastError.ifBlank { "SDK 初始化失败" })
         return try {
             val r: WYLoginResult = v.login(card, getMachineCode(context))
             if (r.success) {
@@ -428,7 +428,8 @@ object SagAuthManager {
                 return@withContext AuthResult(false, lastError.ifBlank { "SDK 初始化失败" })
             }
 
-            val v = wy!!
+            val v = wy
+                ?: return@withContext AuthResult(false, lastError.ifBlank { "SDK 初始化失败" })
             try {
                 val r: WYUnbindResult = v.unbind(card, getMachineCode(context))
                 logout(context)

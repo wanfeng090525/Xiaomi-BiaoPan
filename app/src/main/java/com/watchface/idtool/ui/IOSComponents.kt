@@ -99,6 +99,7 @@ fun ColoredIconTile(
  *
  * @param tileIcon  左侧瓦片图标（null 则不显示瓦片）
  * @param tileTint  瓦片底色
+ * @param dotColor  左侧彩色圆点（iOS 设置「详情分组」风格；优先级低于瓦片）
  * @param title     主文本
  * @param subtitle  副文本（次级灰）
  * @param value     右侧数值（次级灰）
@@ -114,6 +115,7 @@ fun InsetListItem(
     modifier: Modifier = Modifier,
     tileIcon: ImageVector? = null,
     tileTint: Color = IOSPalette.tileBlue,
+    dotColor: Color? = null,
     subtitle: String? = null,
     value: String? = null,
     showArrow: Boolean = false,
@@ -156,6 +158,15 @@ fun InsetListItem(
         if (tileIcon != null) {
             ColoredIconTile(icon = tileIcon, tint = tileTint)
             Spacer(Modifier.width(12.dp))
+        } else if (dotColor != null) {
+            // iOS「详情分组」彩色圆点：10dp 实心圆
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(dotColor)
+            )
+            Spacer(Modifier.width(14.dp))
         }
 
         Column(modifier = Modifier.weight(1f)) {
@@ -184,7 +195,10 @@ fun InsetListItem(
                 fontSize = 17.sp,
                 lineHeight = 22.sp,
                 color = IOSPalette.secondaryLabel,
-                maxLines = 1
+                maxLines = 1,
+                // 等宽表格数字：数值变化时不跳宽（tnum）
+                style = androidx.compose.material3.LocalTextStyle.current
+                    .copy(fontFeatureSettings = "tnum")
             )
             if (showArrow) Spacer(Modifier.width(6.dp))
         }
@@ -214,14 +228,19 @@ fun InsetListItem(
         }
     }
 
-    // 1px 分割线（内缩，不贴卡片边缘 —— iOS InsetGrouped 规格）
+    // 0.5dp 分割线（内缩对齐正文，圆点行/瓦片行各自对齐；颜色更柔和）
     if (!isLast) {
+        val dividerStart = when {
+            tileIcon != null -> 57.dp
+            dotColor != null -> 40.dp
+            else -> 16.dp
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = if (tileIcon != null) 57.dp else 16.dp)
+                .padding(start = dividerStart)
                 .height(0.5.dp)
-                .background(IOSPalette.separator)
+                .background(IOSPalette.separatorSoft)
         )
     }
 }

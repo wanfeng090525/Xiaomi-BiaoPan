@@ -97,17 +97,17 @@ object IOSPalette {
     val tileGlyph = Color(0xFFFFFFFF)
 
     // ---- 交互 ----
-    /** 按下时整体透明度（iOS Active state） */
-    val pressedOpacity = 0.55f
-    val pressedOpacityStrong = 0.4f
+    /** 按下时整体透明度（iOS Active state，26 风格更轻透） */
+    val pressedOpacity = 0.65f
+    val pressedOpacityStrong = 0.45f
 
     // ---- 圆角 ----
-    /** InsetGrouped 卡片圆角 */
-    val cardRadius = 16.dp
+    /** InsetGrouped 卡片圆角（iOS 26 连续大圆角观感） */
+    val cardRadius = 26.dp
     /** ListItem 高亮块圆角 */
-    val rowRadius = 8.dp
+    val rowRadius = 12.dp
     /** 彩色图标瓦片圆角 */
-    val tileRadius = 7.dp
+    val tileRadius = 9.dp
     /** TabBar 胶囊圆角 */
     val tabBarRadius = 28.dp
     /** 圆形搜索按钮半径（直径 52dp → 26dp） */

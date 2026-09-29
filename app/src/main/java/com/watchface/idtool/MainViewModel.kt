@@ -912,8 +912,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val data = withContext(Dispatchers.IO) {
                     if (file.isUri) {
-                        getApplication<Application>().contentResolver
-                            .openInputStream(Uri.parse(file.path))!!.use { it.readBytes() }
+                        val input = getApplication<Application>().contentResolver
+                            .openInputStream(Uri.parse(file.path))
+                            ?: throw Exception(AppLocale.t("无法读取文件，可能已被移动或删除"))
+                        input.use { it.readBytes() }
                     } else {
                         if (file.fileSize > MAX_WATCHFACE_BYTES) {
                             throw Exception(AppLocale.tf("文件过大（{0}），超过 64 MB 限制", RecordStore.formatBytes(file.fileSize)))

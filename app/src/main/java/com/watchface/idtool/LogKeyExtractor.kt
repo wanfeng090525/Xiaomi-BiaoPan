@@ -184,9 +184,8 @@ class LogKeyExtractor(private val inputFile: File) {
         val history = ArrayDeque<String>(WINDOW_SIZE)
 
         BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { reader ->
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                val current = line!!
+            while (true) {
+                val current = reader.readLine() ?: break
                 if (history.size >= WINDOW_SIZE) history.removeFirst()
                 history.addLast(current)
 
