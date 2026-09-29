@@ -23,14 +23,20 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # 缓存 Gradle Wrapper + 依赖 + 构建缓存：首次构建无收益，
+      # 之后每次构建跳过依赖下载和未变更模块的重复编译，是提速关键
+      - name: 缓存 Gradle（依赖 + 构建缓存）
+        uses: gradle/actions/setup-gradle@v4
+
       - name: 生成本地配置并接受 SDK 许可
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
 
       # 同时构建 Debug(自动签名)与 Release(使用源码 keystore/watchface.jks 自动签名)
+      # 不加 --no-daemon：保留守护进程省去 JVM 冷启动
       - name: 一键构建 Debug + 签名 Release (gradlew wrapper)
-        run: ./gradlew --no-daemon assembleDebug assembleRelease
+        run: ./gradlew assembleDebug assembleRelease
 
       - name: 上传 Debug APK
         uses: actions/upload-artifact@v4
