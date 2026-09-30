@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -49,7 +50,6 @@ import com.watchface.idtool.ui.GlassNavTab
 import com.watchface.idtool.ui.GlassNavBar
 import com.watchface.idtool.ui.GlobalRippleOverlay
 import com.watchface.idtool.ui.HistoryScreen
-import com.watchface.idtool.ui.LaunchSplash
 import com.watchface.idtool.ui.LoadingOverlay
 import com.watchface.idtool.ui.LocalAppBackdrop
 import com.watchface.idtool.ui.ModifyScreen
@@ -68,6 +68,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 启动屏（KernelSU 同款）：动画图标至少完整播放 500ms 再放行进入主页
+        val splashStartedAt = android.os.SystemClock.uptimeMillis()
+        installSplashScreen().setKeepOnScreenCondition {
+            android.os.SystemClock.uptimeMillis() - splashStartedAt < 500L
+        }
         super.onCreate(savedInstanceState)
 
         // 启动加载持久化设置（语言 / 背景配置 / 公告开关）
@@ -313,9 +318,6 @@ private fun AppContent() {
 
         // L3 全局点击光效：View 层监听 · 零拦截 · 最顶层绘制
         GlobalRippleOverlay()
-
-        // L4 启动罩：品牌页短暂展示后淡出（覆盖首帧到可交互的空档）
-        LaunchSplash()
         }
     }
 }

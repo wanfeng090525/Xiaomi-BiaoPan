@@ -4,7 +4,17 @@
         <item name="android:statusBarColor">#F2F2F7</item>
         <item name="android:navigationBarColor">#F2F2F7</item>
         <item name="android:windowLightStatusBar">true</item>
-        <!-- 冷启动白闪消除：窗口底色与启动罩白底一致 -->
-        <item name="android:windowBackground">#FFFFFF</item>
+        <!-- 冷启动白闪消除：窗口底色与启动屏底色一致 -->
+        <item name="android:windowBackground">#F5F5F5</item>
+    </style>
+
+    <!-- 启动屏主题（KernelSU 同款 core-splashscreen 方案，minSdk 24 全版本可用）：
+         动画矢量图标画出 Logo，动画 500ms，结束后切换到正式主题 -->
+    <style name="Theme.WatchFaceIdTool.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_splash_background</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/ic_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_splash</item>
+        <item name="windowSplashScreenAnimationDuration">500</item>
+        <item name="postSplashScreenTheme">@style/Theme.WatchFaceIdTool</item>
     </style>
 </resources>

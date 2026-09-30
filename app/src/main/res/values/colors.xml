@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FFFFFFFF</color>
+    <!-- 启动屏矢量用色（与 KernelSU 一致）：Logo 深色 + 启动底色 -->
+    <color name="ic_launcher_foreground">#FF1E110D</color>
+    <color name="ic_splash_background">#FFF5F5F5</color>
 </resources>
