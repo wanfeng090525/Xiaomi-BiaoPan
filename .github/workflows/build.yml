@@ -94,20 +94,9 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-      # 计算要发布到 Release 的文件列表：Debug 仅在选择"开启"时附带
-      - name: 计算发布文件列表
-        id: relfiles
-        run: |
-          if [ "${{ github.event.inputs.debug }}" = "开启" ]; then
-            echo "files<<FILES_EOF" >> "$GITHUB_OUTPUT"
-            echo "app/build/outputs/apk/debug/*.apk" >> "$GITHUB_OUTPUT"
-            echo "app/build/outputs/apk/release/*.apk" >> "$GITHUB_OUTPUT"
-            echo "FILES_EOF" >> "$GITHUB_OUTPUT"
-          else
-            echo "files=app/build/outputs/apk/release/*.apk" >> "$GITHUB_OUTPUT"
-          fi
-
       # 构建成功后自动把 APK 原文件发布到 GitHub Release
+      # Debug 包只在勾选"开启"时才生成；未生成时下面的 debug glob 匹配不到文件，
+      # 动作会自动跳过（fail_on_unmatched_files 默认 false），不会导致发布失败
       - name: 自动发布到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -118,7 +107,9 @@ jobs:
             提交: `${{ github.sha }}`
             R8 混淆: ${{ github.event.inputs.r8 }} ｜ Debug 包: ${{ github.event.inputs.debug }}
             直接下载附带的 .apk 即可安装。
-          files: ${{ steps.relfiles.outputs.files }}
+          files: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
