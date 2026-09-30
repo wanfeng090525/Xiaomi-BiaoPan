@@ -51,18 +51,40 @@ jobs:
           printf "8933bad161af4178b1185d1a37fbf41ea5269c55\n24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
           printf "84831b9409646a918e30573bab4c7c9a3522867b\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
 
-      # 微验 SDK：用 NDK r27 从 app/src/main/cpp 的源码编译 libwyverify.so
+      # 微验 SDK：用 NDK 从 app/src/main/cpp 的源码编译 libwyverify.so
       # （Android.mk 构建前会自动跑 tools/gen_wy_constants.py 生成 RC4 加密常量头）
-      - name: 安装 Android NDK r27
-        id: ndk
+      # ubuntu-latest 已预装 NDK 27.x 且 ANDROID_NDK_HOME 直接指向它，
+      # 命中就复用，省掉 nttld/setup-ndk 下载 NDK 的约 35s
+      - name: 探测运行器自带 NDK 27.x
+        id: probe
+        run: |
+          NDK="${ANDROID_NDK_HOME:-}"
+          case "$NDK" in
+            */ndk/27.*) ;;
+            *) NDK="$(ls -d "$ANDROID_HOME"/ndk/27.* 2>/dev/null | sort -V | tail -1)" ;;
+          esac
+          if [ -n "$NDK" ] && [ -x "$NDK/ndk-build" ]; then
+            echo "ndk-path=$NDK" >> "$GITHUB_OUTPUT"
+            echo "复用运行器自带 NDK：$NDK"
+          else
+            echo "ndk-path=" >> "$GITHUB_OUTPUT"
+            echo "运行器未自带 NDK 27.x，将回退下载安装"
+          fi
+
+      # 兜底：仅当运行器未自带 r27 时才下载（正常情况会被上一步命中而跳过）
+      - name: 下载安装 Android NDK r27（兜底）
+        if: steps.probe.outputs.ndk-path == ''
+        id: setupndk
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27
           link-to-sdk: true
 
       - name: 编译微验 libwyverify.so（arm64-v8a）
+        env:
+          ANDROID_NDK_HOME: ${{ steps.probe.outputs.ndk-path || steps.setupndk.outputs.ndk-path }}
         run: |
-          export ANDROID_NDK_HOME="${{ steps.ndk.outputs.ndk-path }}"
+          test -x "$ANDROID_NDK_HOME/ndk-build" || { echo "NDK 未就绪：$ANDROID_NDK_HOME"; exit 1; }
           python3 app/src/main/cpp/tools/gen_wy_constants.py
           cd app/src/main/cpp
           rm -rf libs obj
