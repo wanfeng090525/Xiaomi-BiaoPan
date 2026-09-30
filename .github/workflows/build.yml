@@ -51,11 +51,21 @@ jobs:
           printf "8933bad161af4178b1185d1a37fbf41ea5269c55\n24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
           printf "84831b9409646a918e30573bab4c7c9a3522867b\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
 
+      # 从 Secrets 还原签名密钥：仓库与 git 历史里都不再存放 .jks / 密码
+      - name: 还原签名密钥（来自 Secrets）
+        run: |
+          mkdir -p app/keystore
+          printf '%s' "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/keystore/watchface.jks
+
       # 组装 Gradle 任务与参数：
       # - Debug 包：默认不构建，输入选"开启"才追加 assembleDebug
       # - R8：默认开启混淆；选"关闭"透传 -Pr8=false，Release 跳过混淆压缩明显提速
       # - 不加 --no-daemon：保留守护进程省去 JVM 冷启动
       - name: 构建 APK（gradlew wrapper，按所选选项执行）
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           TASKS="assembleRelease"
           if [ "${{ github.event.inputs.debug }}" = "开启" ]; then

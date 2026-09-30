@@ -16,3 +16,9 @@ local.properties
 
 # 临时/日志
 *.log
+
+# 签名密钥：不入库（CI 由 GitHub Secrets 还原到 app/keystore/；本地用 keystore.properties）
+app/keystore/
+keystore.properties
+*.jks
+*.keystore

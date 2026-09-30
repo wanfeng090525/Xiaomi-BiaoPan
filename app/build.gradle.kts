@@ -27,15 +27,31 @@ android {
         }
     }
 
+    // 签名密钥不再入库，构建时按以下优先级取值：
+    //   1) 环境变量（CI 用：由 GitHub Secrets 注入，工作流会把 .jks 还原到 app/keystore/）
+    //   2) 根目录 keystore.properties（本地开发用，已在 .gitignore 中，不入库）
+    val signingProps = Properties().apply {
+        val f = rootProject.file("keystore.properties")
+        if (f.exists()) FileInputStream(f).use { load(it) }
+    }
+    fun signingValue(key: String, env: String): String? =
+        System.getenv(env)?.takeIf { it.isNotBlank() } ?: signingProps.getProperty(key)
+
+    val releaseStoreFile = file(signingValue("storeFile", "SIGNING_STORE_FILE") ?: "keystore/watchface.jks")
+    val hasReleaseKeystore = releaseStoreFile.exists()
+
     signingConfigs {
         create("release") {
-            storeFile = file("keystore/watchface.jks")
-            storePassword = "android"
-            keyAlias = "watchface-key"
-            keyPassword = "android"
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
+            // 密钥缺失时不配置签名（Release 产出未签名包），避免本地无密钥时直接构建失败
+            if (hasReleaseKeystore) {
+                storeFile = releaseStoreFile
+                storePassword = signingValue("storePassword", "SIGNING_STORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "SIGNING_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "SIGNING_KEY_PASSWORD")
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
         }
     }
 
@@ -52,7 +68,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = if (hasReleaseKeystore) signingConfigs.findByName("release") else null
         }
     }
 
