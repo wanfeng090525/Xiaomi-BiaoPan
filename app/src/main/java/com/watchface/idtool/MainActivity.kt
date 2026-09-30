@@ -49,6 +49,7 @@ import com.watchface.idtool.ui.GlassNavTab
 import com.watchface.idtool.ui.GlassNavBar
 import com.watchface.idtool.ui.GlobalRippleOverlay
 import com.watchface.idtool.ui.HistoryScreen
+import com.watchface.idtool.ui.LaunchSplash
 import com.watchface.idtool.ui.LoadingOverlay
 import com.watchface.idtool.ui.LocalAppBackdrop
 import com.watchface.idtool.ui.ModifyScreen
@@ -312,6 +313,9 @@ private fun AppContent() {
 
         // L3 全局点击光效：View 层监听 · 零拦截 · 最顶层绘制
         GlobalRippleOverlay()
+
+        // L4 启动罩：品牌页短暂展示后淡出（覆盖首帧到可交互的空档）
+        LaunchSplash()
         }
     }
 }
