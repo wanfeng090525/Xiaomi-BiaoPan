@@ -1,4 +1,4 @@
-package com.weiyan.sdk;
+package com.watchface.idtool.weiyan;
 
 /** 微验结果基类 */
 public class WYResult {

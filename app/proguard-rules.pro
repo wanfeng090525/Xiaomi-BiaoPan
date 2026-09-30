@@ -2,10 +2,10 @@
 # 启用后 R8 会执行：类裁剪、方法内联、字符串折叠、Dead Code Elimination
 
 # ---- 保护微验 SDK（libwyverify.so JNI 静态符号注册，类名/方法名不可混淆） ----
-# native 方法符号为 Java_com_weiyan_sdk_WYVerify_native*，R8 混淆会导致
-# UnsatisfiedLinkError；结果类字段由 JNI 反射 Set*Field 写入，同样必须保留。
--keep class com.weiyan.sdk.** { *; }
--dontwarn com.weiyan.sdk.**
+# native 方法符号为 Java_com_watchface_idtool_weiyan_WYVerify_native*，R8 混淆会
+# 导致 UnsatisfiedLinkError；结果类字段由 JNI 反射 Set*Field 写入，同样必须保留。
+-keep class com.watchface.idtool.weiyan.** { *; }
+-dontwarn com.watchface.idtool.weiyan.**
 
 # ---- Shizuku（反射调用，保留入口） ----
 -keep class rikka.shizuku.** { *; }

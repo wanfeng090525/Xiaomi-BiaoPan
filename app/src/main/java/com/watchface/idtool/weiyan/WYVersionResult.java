@@ -1,4 +1,4 @@
-package com.weiyan.sdk;
+package com.watchface.idtool.weiyan;
 
 /** 版本检查结果 */
 public class WYVersionResult extends WYResult {

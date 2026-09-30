@@ -4,12 +4,12 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.provider.Settings
 import android.util.Base64
-import com.weiyan.sdk.WYHeartbeatResult
-import com.weiyan.sdk.WYLoginResult
-import com.weiyan.sdk.WYNoticeResult
-import com.weiyan.sdk.WYUnbindResult
-import com.weiyan.sdk.WYVerify
-import com.weiyan.sdk.WYVersionResult
+import com.watchface.idtool.weiyan.WYHeartbeatResult
+import com.watchface.idtool.weiyan.WYLoginResult
+import com.watchface.idtool.weiyan.WYNoticeResult
+import com.watchface.idtool.weiyan.WYUnbindResult
+import com.watchface.idtool.weiyan.WYVerify
+import com.watchface.idtool.weiyan.WYVersionResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,7 +33,7 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * 微验卡密登录 / 解绑 / 公告 / 更新 / 心跳
  *
- * 底层调用 libwyverify.so（com.weiyan.sdk.WYVerify）：
+ * 底层调用 libwyverify.so（com.watchface.idtool.weiyan.WYVerify）：
  * 网络验证链接/接口调用码/协议密钥均以密文编译在 .so 内，
  * 必须使用授权密钥（WY_KEY）才能调用，错误时所有接口返回"密钥错误"。
  * 所有接口为同步阻塞调用，均置于 IO 线程执行。

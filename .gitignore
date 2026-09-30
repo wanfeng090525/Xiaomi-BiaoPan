@@ -23,8 +23,10 @@ keystore.properties
 *.jks
 *.keystore
 
-# 微验 SDK：.so 与 native 构建产物全部由 CI 用 NDK 从 app/src/main/cpp 源码生成，不入库
-app/src/main/jniLibs/
-app/src/main/cpp/libs/
-app/src/main/cpp/obj/
-app/src/main/cpp/jni/weiyan/wy_constants_enc.h
+# 微验 SDK：.so 与 native 构建产物全部由 CI 用 NDK 从 app/src/main/jni 源码生成，不入库
+# jniLibs 只保留 .gitkeep 占位，让目录在仓库里可见
+app/src/main/jniLibs/*
+!app/src/main/jniLibs/.gitkeep
+app/src/main/jni/libs/
+app/src/main/jni/obj/
+app/src/main/jni/weiyan/wy_constants_enc.h

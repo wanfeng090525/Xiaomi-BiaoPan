@@ -1,4 +1,4 @@
-package com.weiyan.sdk;
+package com.watchface.idtool.weiyan;
 
 /** 公告结果 */
 public class WYNoticeResult extends WYResult {

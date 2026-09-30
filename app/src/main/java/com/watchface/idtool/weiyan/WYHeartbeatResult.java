@@ -1,4 +1,4 @@
-package com.weiyan.sdk;
+package com.watchface.idtool.weiyan;
 
 /** 心跳验证结果 */
 public class WYHeartbeatResult extends WYResult {

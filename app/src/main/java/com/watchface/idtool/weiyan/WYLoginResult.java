@@ -1,4 +1,4 @@
-package com.weiyan.sdk;
+package com.watchface.idtool.weiyan;
 
 /** 单码登录结果 */
 public class WYLoginResult extends WYResult {

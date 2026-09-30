@@ -52,17 +52,17 @@ static void set_str(JNIEnv *env, jobject obj, const char *cls, const char *f, co
     if (id) env->SetObjectField(obj, id, cstr(env, v));
 }
 
-#define WY_CLASS        "com/weiyan/sdk/WYVerify"
-#define R_NOTICE        "com/weiyan/sdk/WYNoticeResult"
-#define R_VERSION       "com/weiyan/sdk/WYVersionResult"
-#define R_LOGIN         "com/weiyan/sdk/WYLoginResult"
-#define R_UNBIND        "com/weiyan/sdk/WYUnbindResult"
-#define R_HEARTBEAT     "com/weiyan/sdk/WYHeartbeatResult"
+#define WY_CLASS        "com/watchface/idtool/weiyan/WYVerify"
+#define R_NOTICE        "com/watchface/idtool/weiyan/WYNoticeResult"
+#define R_VERSION       "com/watchface/idtool/weiyan/WYVersionResult"
+#define R_LOGIN         "com/watchface/idtool/weiyan/WYLoginResult"
+#define R_UNBIND        "com/watchface/idtool/weiyan/WYUnbindResult"
+#define R_HEARTBEAT     "com/watchface/idtool/weiyan/WYHeartbeatResult"
 
 /* ========== 生命周期 ========== */
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_weiyan_sdk_WYVerify_nativeCreate(JNIEnv *env, jobject thiz, jstring key) {
+Java_com_watchface_idtool_weiyan_WYVerify_nativeCreate(JNIEnv *env, jobject thiz, jstring key) {
     WYVerify *v = new WYVerify();
     /* 授权密钥校验：密钥错误时实例保留但未授权，所有接口返回"密钥错误" */
     v->init(jstr(env, key));
@@ -82,14 +82,14 @@ Java_com_weiyan_sdk_WYVerify_nativeCreate(JNIEnv *env, jobject thiz, jstring key
     } while (0)
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_weiyan_sdk_WYVerify_nativeDestroy(JNIEnv *env, jobject thiz, jlong handle) {
+Java_com_watchface_idtool_weiyan_WYVerify_nativeDestroy(JNIEnv *env, jobject thiz, jlong handle) {
     delete reinterpret_cast<WYVerify *>(handle);
 }
 
 /* ========== 公告 ========== */
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_weiyan_sdk_WYVerify_nativeGetNotice(JNIEnv *env, jobject thiz, jlong handle) {
+Java_com_watchface_idtool_weiyan_WYVerify_nativeGetNotice(JNIEnv *env, jobject thiz, jlong handle) {
     WYVerify *v = reinterpret_cast<WYVerify *>(handle);
     jobject obj = new_obj(env, R_NOTICE);
     WY_CHECK_AUTH(R_NOTICE);
@@ -103,7 +103,7 @@ Java_com_weiyan_sdk_WYVerify_nativeGetNotice(JNIEnv *env, jobject thiz, jlong ha
 /* ========== 检查更新 ========== */
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_weiyan_sdk_WYVerify_nativeCheckUpdate(
+Java_com_watchface_idtool_weiyan_WYVerify_nativeCheckUpdate(
         JNIEnv *env, jobject thiz, jlong handle, jstring currentVersion) {
     WYVerify *v = reinterpret_cast<WYVerify *>(handle);
     jobject obj = new_obj(env, R_VERSION);
@@ -122,7 +122,7 @@ Java_com_weiyan_sdk_WYVerify_nativeCheckUpdate(
 /* ========== 单码登录 ========== */
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_weiyan_sdk_WYVerify_nativeLogin(
+Java_com_watchface_idtool_weiyan_WYVerify_nativeLogin(
         JNIEnv *env, jobject thiz, jlong handle, jstring kami, jstring markcode) {
     WYVerify *v = reinterpret_cast<WYVerify *>(handle);
     jobject obj = new_obj(env, R_LOGIN);
@@ -143,7 +143,7 @@ Java_com_weiyan_sdk_WYVerify_nativeLogin(
 /* ========== 单码解绑 ========== */
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_weiyan_sdk_WYVerify_nativeUnbind(
+Java_com_watchface_idtool_weiyan_WYVerify_nativeUnbind(
         JNIEnv *env, jobject thiz, jlong handle, jstring kami, jstring markcode) {
     WYVerify *v = reinterpret_cast<WYVerify *>(handle);
     jobject obj = new_obj(env, R_UNBIND);
@@ -159,7 +159,7 @@ Java_com_weiyan_sdk_WYVerify_nativeUnbind(
 /* ========== 心跳验证 ========== */
 
 extern "C" JNIEXPORT jobject JNICALL
-Java_com_weiyan_sdk_WYVerify_nativeHeartbeat(
+Java_com_watchface_idtool_weiyan_WYVerify_nativeHeartbeat(
         JNIEnv *env, jobject thiz, jlong handle, jstring kami, jstring markcode, jstring kamitoken) {
     WYVerify *v = reinterpret_cast<WYVerify *>(handle);
     jobject obj = new_obj(env, R_HEARTBEAT);

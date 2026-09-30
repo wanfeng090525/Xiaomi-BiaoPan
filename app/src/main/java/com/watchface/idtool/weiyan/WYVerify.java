@@ -1,4 +1,4 @@
-package com.weiyan.sdk;
+package com.watchface.idtool.weiyan;
 
 /**
  * 微验(WY)验证 SDK - Java 调用入口

@@ -1,4 +1,4 @@
-package com.weiyan.sdk;
+package com.watchface.idtool.weiyan;
 
 /** 单码解绑结果 */
 public class WYUnbindResult extends WYResult {

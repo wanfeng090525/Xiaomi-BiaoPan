@@ -13,7 +13,7 @@
 用法:
     python3 tools/gen_wy_constants.py
 输出:
-    android/jni/weiyan/wy_constants_enc.h   (自动生成，勿手改)
+    app/src/main/jni/weiyan/wy_constants_enc.h   (自动生成，勿手改)
 """
 import hashlib
 import os
@@ -101,5 +101,5 @@ def gen(out_path: str) -> None:
 
 if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))
-    out = os.path.normpath(os.path.join(here, "..", "jni", "weiyan", "wy_constants_enc.h"))
+    out = os.path.normpath(os.path.join(here, "..", "weiyan", "wy_constants_enc.h"))
     gen(out)
