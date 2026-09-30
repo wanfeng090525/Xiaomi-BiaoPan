@@ -51,11 +51,21 @@ jobs:
           printf "8933bad161af4178b1185d1a37fbf41ea5269c55\n24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
           printf "84831b9409646a918e30573bab4c7c9a3522867b\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
 
-      # 微验 SDK：用 NDK 从 app/src/main/cpp 的源码编译 libwyverify.so
-      # （Android.mk 构建前会自动跑 tools/gen_wy_constants.py 生成 RC4 加密常量头）
+      # 微验 .so 缓存：app/src/main/cpp 源码/构建脚本未变时直接复用，
+      # 跳过约 20s 的 ndk-build。key 含源码哈希，源码一改即失效并重新编译。
+      # 注意：刻意不配 restore-keys —— 只接受精确命中，避免回退到旧源码的 .so
+      - name: 缓存微验 libwyverify.so（源码未变则复用）
+        id: socache
+        uses: actions/cache@v4
+        with:
+          path: app/src/main/jniLibs/arm64-v8a/libwyverify.so
+          key: wyverify-so-${{ runner.os }}-${{ hashFiles('app/src/main/cpp/**') }}
+
+      # 以下三步仅在 .so 缓存未命中（源码有变动）时才执行
       # ubuntu-latest 已预装 NDK 27.x 且 ANDROID_NDK_HOME 直接指向它，
       # 命中就复用，省掉 nttld/setup-ndk 下载 NDK 的约 35s
       - name: 探测运行器自带 NDK 27.x
+        if: steps.socache.outputs.cache-hit != 'true'
         id: probe
         run: |
           NDK="${ANDROID_NDK_HOME:-}"
@@ -73,7 +83,7 @@ jobs:
 
       # 兜底：仅当运行器未自带 r27 时才下载（正常情况会被上一步命中而跳过）
       - name: 下载安装 Android NDK r27（兜底）
-        if: steps.probe.outputs.ndk-path == ''
+        if: steps.socache.outputs.cache-hit != 'true' && steps.probe.outputs.ndk-path == ''
         id: setupndk
         uses: nttld/setup-ndk@v1
         with:
@@ -81,6 +91,7 @@ jobs:
           link-to-sdk: true
 
       - name: 编译微验 libwyverify.so（arm64-v8a）
+        if: steps.socache.outputs.cache-hit != 'true'
         env:
           ANDROID_NDK_HOME: ${{ steps.probe.outputs.ndk-path || steps.setupndk.outputs.ndk-path }}
         run: |
