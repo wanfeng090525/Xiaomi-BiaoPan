@@ -4,7 +4,7 @@
         <item name="android:statusBarColor">#F2F2F7</item>
         <item name="android:navigationBarColor">#F2F2F7</item>
         <item name="android:windowLightStatusBar">true</item>
-        <!-- 冷启动白闪消除：窗口底色与页面底色一致 -->
-        <item name="android:windowBackground">#F2F2F7</item>
+        <!-- 冷启动白闪消除：窗口底色与启动罩白底一致 -->
+        <item name="android:windowBackground">#FFFFFF</item>
     </style>
 </resources>

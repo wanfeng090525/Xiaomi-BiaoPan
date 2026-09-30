@@ -7,7 +7,7 @@
         <item name="android:navigationBarColor">#F2F2F7</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowBackground">#F2F2F7</item>
-        <item name="android:windowSplashScreenBackground">#F2F2F7</item>
+        <item name="android:windowSplashScreenBackground">#FFFFFF</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 </resources>
