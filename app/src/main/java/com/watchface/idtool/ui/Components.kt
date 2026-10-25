@@ -1113,12 +1113,25 @@ private fun HarnessWallpaperBackground(modifier: Modifier = Modifier) {
                             val tw = width.toFloat()
                             val th = height.toFloat()
                             if (vw <= 0 || vh <= 0 || tw <= 0f || th <= 0f) return@post
-                            // Cover：等比放大到完全覆盖，居中裁掉溢出
+                            // Cover 基础：等比放大到完全覆盖，居中裁掉溢出
                             val sx = tw / vw
                             val sy = th / vh
-                            val s = maxOf(sx, sy)
+                            var s = maxOf(sx, sy)
+                            // 微调：额外放大 12%，人物更饱满（覆盖余量更足）
+                            s *= 1.12f
                             val matrix = android.graphics.Matrix()
                             matrix.setScale(s, s, tw / 2f, th / 2f)
+                            // 焦点上移：视频人物在画面右侧偏下，放大后把垂直方向
+                            // 取景焦点从 50% 上移到 42%（脸部落到屏幕中上部）
+                            // 溢出量 = 视频绘制高度 − 屏高；可移动范围的一半
+                            val drawnH = vh * s
+                            val overflowY = (drawnH - th).coerceAtLeast(0f)
+                            if (overflowY > 0f) {
+                                // translationY 负值 = 画面上移 = 露出更靠下的内容
+                                // 焦点 42% < 50% → 画面上移，人物上移到中上部
+                                val focus = 0.42f
+                                matrix.postTranslate(0f, overflowY * (0.5f - focus))
+                            }
                             setTransform(matrix)
                         }
                     }
@@ -1137,6 +1150,15 @@ private fun HarnessWallpaperBackground(modifier: Modifier = Modifier) {
                                 mp.setSurface(android.view.Surface(st))
                                 mp.setDataSource(file.absolutePath)
                                 mp.isLooping = true
+                                // 关键：把音频属性声明为「系统提示音」——MIUI 等国产 ROM
+                                // 会检测到「应用开始播放视频媒体」就暂停后台音乐，
+                                // 声明为 sonification + 静音可绕开该检测，不打断用户音乐
+                                mp.setAudioAttributes(
+                                    android.media.AudioAttributes.Builder()
+                                        .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                        .build()
+                                )
                                 mp.setVolume(0f, 0f)
                                 mp.setOnVideoSizeChangedListener { _, vw, vh ->
                                     applyCoverMatrix(vw, vh)
