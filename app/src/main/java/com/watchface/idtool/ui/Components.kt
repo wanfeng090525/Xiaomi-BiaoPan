@@ -1099,53 +1099,84 @@ private fun HarnessWallpaperBackground(modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     Box(modifier.fillMaxSize()) {
-        // ---- 主层：动态壁纸视频（Cover 自适应铺满，循环无音轨） ----
+        // ---- 主层：动态壁纸视频（TextureView + Matrix Cover 变换，循环无音轨） ----
+        // VideoView 内部 onMeasure 会按视频比例 letterbox 且无法从外部覆盖，
+        // 改用 TextureView：SurfaceTexture 送 MediaPlayer，绘制矩阵完全可控
         AndroidView(
             factory = { ctx ->
-                android.widget.VideoView(ctx).apply {
-                    try {
-                        val file = java.io.File(ctx.filesDir, "wallpaper_live.mp4")
-                        if (!file.exists() || file.length() == 0L) {
-                            ctx.assets.open("wallpaper_live.mp4").use { input ->
-                                file.outputStream().use { output -> input.copyTo(output) }
-                            }
+                android.view.TextureView(ctx).apply {
+                    var mediaPlayer: android.media.MediaPlayer? = null
+
+                    fun applyCoverMatrix(vw: Int, vh: Int) {
+                        // 等待完成布局后再算（否则宽高为 0）
+                        post {
+                            val tw = width.toFloat()
+                            val th = height.toFloat()
+                            if (vw <= 0 || vh <= 0 || tw <= 0f || th <= 0f) return@post
+                            // Cover：等比放大到完全覆盖，居中裁掉溢出
+                            val sx = tw / vw
+                            val sy = th / vh
+                            val s = maxOf(sx, sy)
+                            val matrix = android.graphics.Matrix()
+                            matrix.setScale(s, s, tw / 2f, th / 2f)
+                            setTransform(matrix)
                         }
-                        setVideoPath(file.absolutePath)
-                        setOnPreparedListener { mp ->
-                            mp.isLooping = true
-                            mp.setVolume(0f, 0f)
-                            // Cover 自适应核心：视频尺寸就绪后按 TextureView 实际
-                            // 大小等比放大至完全覆盖，居中裁掉溢出部分
-                            mp.setOnVideoSizeChangedListener { _, vw, vh ->
-                                if (vw > 0 && vh > 0) {
-                                    val lp = layoutParams
-                                    val vwF = vw.toFloat()
-                                    val vhF = vh.toFloat()
-                                    // 先铺满容器：取 scaleX/scaleY 的较大者
-                                    if (lp != null && lp.width > 0 && lp.height > 0) {
-                                        val sx = lp.width / vwF
-                                        val sy = lp.height / vhF
-                                        val s = maxOf(sx, sy)
-                                        scaleX = s
-                                        scaleY = s
-                                        pivotX = lp.width / 2f
-                                        pivotY = lp.height / 2f
+                    }
+
+                    surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
+                        override fun onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
+                            try {
+                                val file = java.io.File(ctx.filesDir, "wallpaper_live.mp4")
+                                if (!file.exists() || file.length() == 0L) {
+                                    ctx.assets.open("wallpaper_live.mp4").use { input ->
+                                        file.outputStream().use { output -> input.copyTo(output) }
                                     }
                                 }
+                                val mp = android.media.MediaPlayer()
+                                mediaPlayer = mp
+                                mp.setSurface(android.view.Surface(st))
+                                mp.setDataSource(file.absolutePath)
+                                mp.isLooping = true
+                                mp.setVolume(0f, 0f)
+                                mp.setOnVideoSizeChangedListener { _, vw, vh ->
+                                    applyCoverMatrix(vw, vh)
+                                }
+                                mp.setOnPreparedListener {
+                                    videoReady = true
+                                    applyCoverMatrix(it.videoWidth, it.videoHeight)
+                                    it.start()
+                                }
+                                mp.setOnErrorListener { _, _, _ ->
+                                    videoReady = false
+                                    true
+                                }
+                                mp.prepareAsync()
+                            } catch (_: Exception) {
+                                videoReady = false
                             }
-                            videoReady = true
-                            start()
                         }
-                        setOnErrorListener { _, _, _ ->
-                            videoReady = false
-                            true
+
+                        override fun onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int) {
+                            // 屏幕旋转/尺寸变化：按当前视频尺寸重算 Cover
+                            mediaPlayer?.let { applyCoverMatrix(it.videoWidth, it.videoHeight) }
                         }
-                    } catch (_: Exception) {
-                        videoReady = false
+
+                        override fun onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean {
+                            mediaPlayer?.run {
+                                try {
+                                    stop()
+                                    release()
+                                } catch (_: Exception) { }
+                            }
+                            mediaPlayer = null
+                            return true
+                        }
+
+                        override fun onSurfaceTextureUpdated(st: android.graphics.SurfaceTexture) = Unit
                     }
                 }
             },
-            update = { /* 状态驱动不重建，循环由 isLooping 维持 */ },
+            update = { },
             modifier = Modifier.fillMaxSize()
         )
 
