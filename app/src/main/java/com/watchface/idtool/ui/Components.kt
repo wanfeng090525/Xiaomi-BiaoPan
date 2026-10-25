@@ -1114,24 +1114,12 @@ private fun HarnessWallpaperBackground(modifier: Modifier = Modifier) {
                             val th = height.toFloat()
                             if (vw <= 0 || vh <= 0 || tw <= 0f || th <= 0f) return@post
                             // Cover 基础：等比放大到完全覆盖，居中裁掉溢出
-                            // （视频已提升到 2560×1300 原生分辨率，无额外放大，
-                            //   竖屏铺满约 1.8 倍以内，清晰度最佳）
+                            // （107 规格：纯 cover，无额外放大，构图完整）
                             val sx = tw / vw
                             val sy = th / vh
                             val s = maxOf(sx, sy)
                             val matrix = android.graphics.Matrix()
                             matrix.setScale(s, s, tw / 2f, th / 2f)
-                            // 焦点上移：视频人物在画面右侧偏下，放大后把垂直方向
-                            // 取景焦点从 50% 上移到 42%（脸部落到屏幕中上部）
-                            // 溢出量 = 视频绘制高度 − 屏高；可移动范围的一半
-                            val drawnH = vh * s
-                            val overflowY = (drawnH - th).coerceAtLeast(0f)
-                            if (overflowY > 0f) {
-                                // translationY 负值 = 画面上移 = 露出更靠下的内容
-                                // 焦点 42% < 50% → 画面上移，人物上移到中上部
-                                val focus = 0.42f
-                                matrix.postTranslate(0f, overflowY * (0.5f - focus))
-                            }
                             setTransform(matrix)
                         }
                     }
